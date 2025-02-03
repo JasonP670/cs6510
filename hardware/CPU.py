@@ -56,9 +56,9 @@ class CPU:
         self.setPC(pcb['start_line'])
     
     def run_program(self, pcb, verbose=False):
-        start_time = self.system.clock.time
+        pcb['start_time'] = self.system.clock.time
         if verbose: self.verbose = True
-        self.registers = pcb.registers
+        self.registers = pcb['registers'].copy()
         code_start = pcb['code_start']
         code_end = pcb['code_end']
         self.registers[self.pc] = code_start
@@ -72,8 +72,10 @@ class CPU:
                 if operands[0] == 1:
                     pcb.registers = self.registers.copy()
                     pcb.terminated()
+                    pcb['end_time'] = self.system.clock.time
                     self.system_call(0)
-                    print("End of program")
+                    if self.verbose:
+                        print("End of program")
                     break
                 elif operands[0] == 2:
                     print(f'Result of operations: {self.registers[0]}')

@@ -9,6 +9,7 @@ class PCB:
         self.state = state
         self.states = ['NEW', 'READY', 'RUNNING', 'WAITING', 'TERMINATED']
         self.loader = None
+        self.byte_size = None
         self.data_start = None
         self.data_end = None
         self.code_start = None
@@ -23,7 +24,9 @@ class PCB:
     def __str__(self):
         return f"PCB(pid={self.pid}, file={self.file}, state={self.state})"
         
-        
+    def __repr__(self):
+        return f"PCB(pid={self.pid}, file={self.file}, state={self.state})"
+    
     def __getitem__(self, key):
         return getattr(self, key)
     
@@ -41,7 +44,8 @@ class PCB:
         self.state = 'WAITING'
     def terminated(self):
         self.state = 'TERMINATED'
-    
+    def set_arrival_time(self, time):    
+        self.arrival_time = time
     # def set_state(self, new_state):
     #     self.state = new_state
     
@@ -66,8 +70,7 @@ class PCB:
     # def get_arrival_time(self):
     #     return self.arrival_time
     
-    def set_arrival_time(self, time):    
-        self.arrival_time = time
+    
 
     # def set_start_time(self, time):
     #     self.start_time = time
