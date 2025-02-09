@@ -23,7 +23,6 @@ class ShellMode(Modes):
             if verbose:
                 self.System.verbose = True
 
-
             if cmd == 'bash':
                 return 'bash'
             if cmd == 'exit':

@@ -9,6 +9,7 @@ class PCB:
         self.state = state
         self.states = ['NEW', 'READY', 'RUNNING', 'WAITING', 'TERMINATED']
         self.loader = None
+        self.byte_size = None
         self.data_start = None
         self.data_end = None
         self.code_start = None
@@ -19,11 +20,14 @@ class PCB:
         self.start_time = None
         self.end_time = None
         self.file = None
+        self.children = []
 
     def __str__(self):
         return f"PCB(pid={self.pid}, file={self.file}, state={self.state})"
         
-        
+    def __repr__(self):
+        return f"PCB(pid={self.pid}, file={self.file}, state={self.state})"
+    
     def __getitem__(self, key):
         return getattr(self, key)
     
@@ -41,39 +45,31 @@ class PCB:
         self.state = 'WAITING'
     def terminated(self):
         self.state = 'TERMINATED'
-    
-    # def set_state(self, new_state):
-    #     self.state = new_state
-    
-    # def get_state(self):
-    #     return self.state
-    
-    # def get_pid(self):
-    #     return self.pid
-    
-    # def get_execution_time(self):
-    #     return self.execution_time
-    
-    # def set_execution_time(self, time):
-    #     self.execution_time = time
-
-    # def set_start_line(self, line):
-    #     self.start_line = line 
-
-    # def set_end_line(self, line):
-    #     self.end_line = line
-
-    # def get_arrival_time(self):
-    #     return self.arrival_time
-    
     def set_arrival_time(self, time):    
         self.arrival_time = time
 
-    # def set_start_time(self, time):
-    #     self.start_time = time
+    def get_pc(self):
+        return self.registers[11]
+   
+    def make_child(self, pid, pc):
+        child = PCB(pid, pc, self.registers.copy(), self.state)
+        child.loader = self.loader
+        child.byte_size = self.byte_size
+        child.data_start = self.data_start
+        child.data_end = self.data_end
+        child.code_start = self.code_start
+        child.code_end = self.code_end
+        child.file = self.file
 
-    # def set_end_time(self, time):
-    #     self.end_time = time
+        self.add_child(child)
 
-    # def set_file(self, file):
-    #     self.file = file
+        return child
+    
+    def has_children(self):
+        return len(self.children) > 0
+    
+    def add_child(self, child):
+        self.children.append(child)
+    
+    def get_children(self):
+        return self.children
