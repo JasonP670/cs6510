@@ -66,8 +66,9 @@ class CPU:
         if verbose: self.verbose = True
 
         # Restor CPU state from PCB
-        self.registers = pcb['registers'].copy()
-        self.registers[self.pc] = pcb['pc']
+        self.pcb = pcb
+        self.registers = pcb.registers.copy()
+        self.registers[self.pc] = pcb.pc
 
         self.running = True
 
@@ -135,11 +136,25 @@ class CPU:
 
 
             
-        elif swi == 10:
-            pcb['registers'] = self.registers.copy()
+        elif swi == 10: # FORK
+            pcb.registers = self.registers.copy()
+            pcb.pc = self.registers[self.pc]
             self.system.fork(pcb)
-            self.registers = pcb['registers'].copy()
-
+            # self.registers = pcb.registers.copy()
+            self.verbose = False
+            self.running = False
+            return
+        
+        elif swi == 11: # EXEC
+            self.system.exec(pcb)
+            self.verbose = False
+            self.running = False
+            return
+        
+        elif swi == 12: # WAIT
+            self.system.wait(pcb)
+            return True
+        
         return True
             
 
@@ -354,11 +369,12 @@ class CPU:
             Jump to label if Z register is equal to zero
         """
         address_bytes = operands[0:4]
-        address = struct.unpack('<I', bytes(address_bytes))[0]
+        address = struct.unpack('<I', bytes(address_bytes))[0] + self.pcb.loader
+        
         if self.registers[self.z] == 0:
             self.setPC(address)
             if self.verbose:
-                print(f" - BEQ {address}")
+                print(f"\tBEQ address: {address}")
 
     def _cmp(self, operands):
         """

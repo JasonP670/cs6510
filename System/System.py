@@ -19,7 +19,7 @@ except ImportError:
     from Scheduler import Scheduler
     from MemoryManager import MemoryManager
 
-from constants import USER_MODE, KERNEL_MODE, SYSTEM_CODES
+from constants import USER_MODE, KERNEL_MODE, SYSTEM_CODES, PCBState, CHILD_EXEC_PROGRAM
 
 
 class System:
@@ -103,7 +103,8 @@ class System:
                 self.job_queue.append(pcb)
             else:
                 return None
-            
+        
+        self.print("Programs added to job queue.")
         if self.verbose:
             self.display_state_table()
 
@@ -130,40 +131,11 @@ class System:
         self.print(f"Running program: {pcb}")
 
         self.CPU.run_program(pcb, self.verbose)
-        # while pcb['state'] != 'TERMINATED':
-
-            
-        #     if pcb['state'] == 'TERMINATED' and len(pcb.get_children()) == 0:
-        #         self.memory_manager.free_memory(pcb)
-        #         self.terminated_queue.append(pcb)
-        #         pcb['end_time'] = self.clock.time
-                
-        #     elif pcb['state'] == 'WAITING':
-        #         self.memory_manager.free_memory(pcb)
-        #         self.io_queue.append(pcb)
-        #         if self.verbose:
-        #             self.display_state_table()
-        #         n = random.randint(1, 50)
-        #         self.clock.time += n
-        #         self.print(f"Program {pcb} is waiting for {n} cycles.")
-        #         self.io_queue.remove(pcb)
-        #         pcb.ready(self.clock.time)
-        #         self.ready_queue.append(pcb)
-        #         break
-
-
-        #     elif pcb['state'] == 'READY':
-        #         self.ready_queue.append(pcb)
-        #         break
-
-        # if pcb['state'] == 'TERMINATED' and pcb.has_children():
-        #     self.wait(pcb)
 
     def handle_load(self, filepath):
         program_info = self.memory_manager.prepare_program(filepath)
         if program_info:
             pcb = self.create_pcb(program_info, self.clock.time)
-            # pcb.update(program_info)
             self.memory_manager.load_to_memory(pcb)
             self.job_queue.append(pcb)
         # Display state table after command execution
@@ -211,7 +183,7 @@ class System:
 
         pcb = None
         for job in self.job_queue + self.ready_queue:
-            if job['file'] == program:
+            if job.file == program:
                 pcb = job
                 break
         self.job_queue.remove(pcb)
@@ -220,10 +192,10 @@ class System:
         pcb.start_time = self.clock.time
         self.CPU.run_program(pcb, self.verbose)
 
-        if pcb['state'] == 'TERMINATED':
+        if pcb.state == PCBState.TERMINATED:
             self.memory_manager.free_memory(pcb)
             self.terminated_queue.append(pcb)
-            pcb['end_time'] = self.clock.time
+            pcb.end_time = self.clock.time
 
         if self.verbose:
             self.display_state_table()
@@ -284,25 +256,52 @@ class System:
         self.pid += 1
 
         # Copy parent PCB
-        child_pcb = parent_pcb.make_child(new_pid, parent_pcb.get_pc())
+        child_pcb = parent_pcb.make_child(new_pid, parent_pcb.pc)
 
-        child_pcb['arrival_time'] = self.clock.time
-        child_pcb.ready()
+        child_pcb.arrival_time = self.clock.time
+        # child_pcb.ready(self.clock.time)
 
         parent_pcb.registers[0] = new_pid
         child_pcb.registers[0] = 0
 
-        self.ready_queue.append(child_pcb)
+        parent_pcb.state = PCBState.READY
+        child_pcb.state = PCBState.READY
 
         self.print(f"Forked child process: {child_pcb}")
 
-        return child_pcb
+        self.ready_queue.append(child_pcb)
+        # self.ready_queue.append(parent_pcb) This will be done by the scheduler
 
-    def wait(self, parent_pcb):
-        for child_pcb in parent_pcb.get_children():
-            while child_pcb['state'] != 'TERMINATED':
-                self.run_pcb(child_pcb)
-        msg = f"Parent process {parent_pcb} has waited for all children to terminate"
+        # self.run_pcb(child_pcb)
+
+    def exec(self, pcb):
+        filepath = CHILD_EXEC_PROGRAM
+        # arrival_time = self.clock.time
+
+        program_info = self.memory_manager.prepare_program(filepath)
+        
+        if program_info:
+            pcb.file = program_info['filepath']
+            pcb.loader = program_info['loader']
+            pcb.byte_size = program_info['byte_size']
+            pcb.data_start = program_info['data_start']
+            pcb.data_end = program_info['data_end']
+            pcb.code_start = program_info['code_start']
+            pcb.code_end = program_info['code_end']
+            pcb.pc = program_info['pc']
+            # pcb.arrival_time = arrival_time
+
+            self.memory_manager.load_to_memory(pcb)
+            self.run_pcb(pcb)
+        else:
+            return None
+
+    def wait(self, pcb):
+        if any([child_pcb.state != PCBState.TERMINATED for child_pcb in pcb.get_children()]):
+            self.print(f"Parent process {pcb} is waiting for children to terminate")
+            pcb.ready(self.clock.time)
+            return
+        msg = f"Parent process {pcb} has waited for all children to terminate"
         self.print(msg)
 
     def display_state_table(self):
@@ -319,7 +318,7 @@ class System:
                 table_data.append([
                     pcb.pid,
                     pcb.file,
-                    pcb.state,
+                    pcb.state.name,
                     queue_name,
                     pcb.arrival_time,
                     pcb.start_time,
@@ -347,10 +346,10 @@ class System:
 if __name__ == '__main__':
     system = System()
     system.verbose = True
-    # system.call('execute', 'programs/add.osx', 0)
-    system.handle_load('programs/add.osx')
-    result = system.run_program('programs/add.osx')
-    assert result == 2
+    system.call('execute', 'programs/fork.osx', 0)
+    # system.handle_load('programs/add.osx')
+    # result = system.run_program('programs/add.osx')
+    # assert result == 2
 
 
 # SWI to simulate user input, add a random amount of time to the clock, or add a certain amount for each SWI and add multiple SWI

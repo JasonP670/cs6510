@@ -1,5 +1,7 @@
+from constants import PCBState
+
 class PCB:
-    def __init__(self, pid, pc, registers=None, state="NEW"):
+    def __init__(self, pid, pc, registers=None, state=PCBState.NEW):
         self.pid = pid
         self.file = None
 
@@ -12,7 +14,7 @@ class PCB:
 
         # States
         self.state = state
-        self.states = ['NEW', 'READY', 'RUNNING', 'WAITING', 'TERMINATED']
+        # self.states = ['NEW', 'READY', 'RUNNING', 'WAITING', 'TERMINATED']
 
         # Code Sections
         self.loader = None
@@ -35,10 +37,10 @@ class PCB:
         self.children = []
 
     def __str__(self):
-        return f"PCB(pid={self.pid}, file={self.file}, state={self.state})"
+        return f"PCB(pid={self.pid}, file={self.file}, state={self.state.name})"
         
     def __repr__(self):
-        return f"PCB(pid={self.pid}, file={self.file}, state={self.state})"
+        return f"PCB(pid={self.pid}, file={self.file}, state={self.state.name})"
     
     def __getitem__(self, key):
         return getattr(self, key)
@@ -50,21 +52,21 @@ class PCB:
         return self.pid == other.pid
     
     def ready(self, time):
-        self.state = 'READY'
+        self.state = PCBState.READY
         if self.start_time == None:
             self.start_time = time
             self.waiting_time = time - self.arrival_time
 
     def running(self): 
-        self.state = 'RUNNING'
+        self.state = PCBState.RUNNING
         if self.response_time == None:
             self.response_time = self.start_time - self.arrival_time
 
     def waiting(self):
-        self.state = 'WAITING'
+        self.state = PCBState.WAITING
 
     def terminated(self, time):
-        self.state = 'TERMINATED'
+        self.state = PCBState.TERMINATED
         self.end_time = time
         self.turnaround_time = self.end_time - self.arrival_time
         self.waiting_time = self.turnaround_time - self.execution_time
@@ -83,7 +85,7 @@ class PCB:
         child.data_end = self.data_end
         child.code_start = self.code_start
         child.code_end = self.code_end
-        child.file = self.file
+        child.file = self.file + " (child)"
 
         self.add_child(child)
 
