@@ -26,7 +26,7 @@ class System:
     def __init__(self):
         self.clock = Clock()
         self.scheduler = Scheduler(self)
-        self.memory_manager = MemoryManager(self, '1K')
+        self.memory_manager = MemoryManager(self, '1M')
         self.memory = self.memory_manager.memory
         self.CPU = CPU(self.memory, self)
         self.mode = USER_MODE

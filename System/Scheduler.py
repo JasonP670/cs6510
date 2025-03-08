@@ -81,7 +81,7 @@ class Scheduler:
             
     def print_time(self):
         """ Print the current time."""
-        print(f"==================== Clock: {self.system.clock.time} ====================")
+        self.system.print(f"==================== Clock: {self.system.clock.time} ====================")
 
     def jobs_in_ready_queue(self):
         """ Check if there are jobs in the ready queue."""
