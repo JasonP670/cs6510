@@ -1,11 +1,15 @@
 import random
 from constants import PCBState
+from System.Queue import Queue
 
 class Scheduler:
     def __init__(self, system):
         self.system = system
-        self.scheduling_algorithms = ['FCFS', 'SJF', 'RR', 'Priority']
-        self.scheduling_algorithm = 'FCFS'
+        self.scheduling_strategies = ['FCFS', 'RR', 'MLQ']
+        self.scheduling_strategy = 'FCFS'
+        self.Q1 = Queue()
+        self.Q2 = Queue()
+        self.QFCFS = Queue()
 
 
     def schedule_jobs(self):
@@ -97,6 +101,26 @@ class Scheduler:
                 self.system.io_queue.pop(i)
                 self.system.ready_queue.append(pcb)
                 self.system.print(f"IO complete for {pcb}")
+
+    def setRR(self, *args):
+        if len(args) != 2:
+            raise ValueError("Invalid number of arguments")
+        quantum1, quantum2 = args
+        self.Q1.set_quantum(quantum1)
+        self.Q2.set_quantum(quantum2)
+        return True
+    
+    def set_strategy(self, strategy):
+        if len(self.Q1) > 0 or len(self.Q2) > 0 or len(self.QFCFS) > 0:
+            return False
+        
+        if strategy in self.scheduling_strategies:
+            self.scheduling_strategy = strategy
+            if strategy == 'FCFS':
+                self.Q1.set_quantum(1000000)
+            return True
+        
+        return False
 
     def print_metrics(self, start_time):
         end_time = self.system.clock.time
