@@ -1,7 +1,8 @@
 import os
 import sys
 from tabulate import tabulate
-import random
+import traceback
+from typing import Optional
 
 try:
     from hardware.CPU import CPU
@@ -19,7 +20,10 @@ except ImportError:
     from Scheduler import Scheduler
     from MemoryManager import MemoryManager
 
-from constants import USER_MODE, KERNEL_MODE, SYSTEM_CODES, PCBState, CHILD_EXEC_PROGRAM
+from constants import (
+    USER_MODE, KERNEL_MODE, SYSTEM_CODES,
+    PCBState, CHILD_EXEC_PROGRAM
+)
 
 
 class System:
@@ -30,7 +34,7 @@ class System:
         self.memory = self.memory_manager.memory
         self.CPU = CPU(self.memory, self)
         self.mode = USER_MODE
-        self.verbose = False
+        self.verbose = True  # False is default, True is for testing
         self.errors = []
         self.system_codes = SYSTEM_CODES
         self.pid = 0
@@ -53,6 +57,11 @@ class System:
             "ready_queue": lambda: print(self.ready_queue),
             "io_queue": lambda: print(self.io_queue),
             "terminated_queue": lambda: print(self.terminated_queue),
+            "load_process": self.load_process_to_memory,
+            "setRR": self.set_quantum,
+            "setschd": self.setschd,
+            "gantt": self.create_gantt_chart,
+            "run_scheduler": self.run_scheduler  # Fixed typo in command name
         }
 
     def switch_mode(self):
@@ -64,23 +73,44 @@ class System:
     def call(self, cmd, *args):
         if cmd in self.commands:
             try:
+                # Convert arguments to integers for setRR
+
                 # Switch to kernel mode to execute the command
                 self.switch_mode()
                 self.print(f"\nExecuting command: {cmd}")
+
                 # Look up the command in the dictionary and execute it
-                self.commands[cmd](*args)
+                result = self.commands[cmd](*args)
+
+                # Run scheduler after certain commands if processes exist
+                if (cmd in ['setRR', 'setschd'] and
+                        self.scheduler.jobs_in_any_queue()):
+                    self.run_scheduler()
+
                 # Switch back to user mode after executing the command
                 self.switch_mode()
                 # Verbose is set to true in the shell, after running reset it
                 self.verbose = False
+
+                return result
+            except ValueError as e:
+                print(f"ValueError: {e}. Invalid arguments for command: {cmd}")
+                print(traceback.format_exc())
+                return None
             except TypeError as e:
                 self.system_code(103)
-                print(e)
-                print(f"Invalid arguments for command: {cmd}")
+                print(f"TypeError: {e}. Invalid arguments for command: {cmd}")
+                print(traceback.format_exc())
+                return None
+            except KeyError as e:
+                print(f"KeyError: {e}. Command not found: {cmd}")
+                print(traceback.format_exc())
+                return None
             except Exception as e:
-                print(e)
+                print(f"Unexpected error: {e}")
+                print(traceback.format_exc())
                 self.system_code(100)
-
+                return None
         else:
             print(f"Unknown command: {cmd}")
             self.system_code(103)
@@ -122,7 +152,7 @@ class System:
         pcb.data_end = program_info['data_end']
         pcb.code_start = program_info['code_start']
         pcb.code_end = program_info['code_end']
-        pcb.arrival_time = arrival_time
+        pcb.arrival_time = int(arrival_time)
 
         return pcb
 
@@ -143,15 +173,32 @@ class System:
             self.display_state_table()
 
     def handle_check_memory_available(self, pcb):
-        try:
-            if self.memory_manager.check_memory_available(pcb):
-                return True
-        except Exception as e:
-            print(e)
+        """Check if memory is available for a process.
 
-        return False
-    
+        Args:
+            pcb: Process Control Block to check memory for
+
+        Returns:
+            bool: True if memory is available, False otherwise
+        """
+        try:
+            return self.memory_manager.check_memory_available(pcb)
+        except MemoryError as e:
+            print(f"Memory error: {e}")
+            return False
+        except Exception as e:
+            print(f"Error checking memory availability: {e}")
+            return False
+
     def handle_load_to_memory(self, pcb):
+        """Load a process to memory.
+
+        Args:
+            pcb: Process Control Block to load
+
+        Returns:
+            bool: True if load was successful, False otherwise
+        """
         try:
             if self.memory_manager.load_to_memory(pcb):
                 return True
@@ -289,16 +336,17 @@ class System:
             pcb.code_start = program_info['code_start']
             pcb.code_end = program_info['code_end']
             pcb.pc = program_info['pc']
-            # pcb.arrival_time = arrival_time
 
             self.memory_manager.load_to_memory(pcb)
             self.run_pcb(pcb)
         else:
-            return None
+            return
 
     def wait(self, pcb):
-        if any([child_pcb.state != PCBState.TERMINATED for child_pcb in pcb.get_children()]):
-            self.print(f"Parent process {pcb} is waiting for children to terminate")
+        if any(child_pcb.state != PCBState.TERMINATED
+               for child_pcb in pcb.get_children()):
+            self.print(
+                f"Parent process {pcb} is waiting for children to terminate")
             pcb.ready(self.clock.time)
             return
         msg = f"Parent process {pcb} has waited for all children to terminate"
@@ -341,6 +389,304 @@ class System:
         print("\nSystem State Table:")
         print(tabulate(table_data, headers=headers, tablefmt="grid"))
         print()
+
+    def print_numerical_gantt(self):
+        """Print a text-based Gantt chart using numbers in the terminal.
+        Legend:
+        - '-': Before arrival or after completion
+        - '0': Waiting/Ready
+        - '1': Running
+        - '2': Terminated
+        """
+        if not self.terminated_queue:
+            print("No completed processes to display in Gantt chart.")
+            return
+
+        # Find the overall timeline boundaries
+        start_time = min(pcb.arrival_time for pcb in self.terminated_queue)
+        end_time = max(pcb.end_time for pcb in self.terminated_queue)
+
+        # Print header with time markers
+        print("\nNumerical Gantt Chart:")
+        print("Legend: '-' = Not started/finished, '0' = Finished")
+        print("        '1' = Running, '2' = Waiting")
+        print("\nTime:", end=" ")
+        for t in range(start_time, end_time + 1):
+            print(f"{t:1}", end="")
+        print()
+
+        # Print timeline for each process
+        for pcb in sorted(self.terminated_queue, key=lambda x: x.pid):
+            print(f"P{pcb.pid:2}:", end=" ")
+
+            for t in range(start_time, end_time + 1):
+                if t < pcb.arrival_time or t >= pcb.end_time:
+                    print("-", end="")
+                elif pcb.start_time <= t < pcb.end_time:
+                    # Check process state at time t
+                    if pcb.state == PCBState.RUNNING:
+                        print("1", end="")
+                    elif pcb.state == PCBState.WAITING:
+                        print("2", end="")
+                    else:  # READY, WAITING, or other states
+                        print("0", end="")
+                else:
+                    print("0", end="")
+            print()  # New line after each process
+        print()
+
+    def create_gantt_chart(self):
+        """Create and display a Gantt chart of process execution."""
+        try:
+            import matplotlib.pyplot as plt
+
+            # Collect process execution data
+            processes = {}  # pid -> [(start_time, end_time, queue)]
+
+            # Track execution periods for each process
+            for pcb in self.terminated_queue:
+                if pcb.pid not in processes:
+                    processes[pcb.pid] = []
+                processes[pcb.pid].append((
+                    pcb.start_time,
+                    pcb.end_time,
+                    'Ready Queue'
+                ))
+
+            # Create the Gantt chart
+            _, ax = plt.subplots(figsize=(12, 6))
+
+            # Colors for different queues
+            colors = {
+                'Ready Queue': '#2ecc71',
+                'I/O Queue': '#e74c3c',
+                'Waiting': '#3498db'
+            }
+
+            # Plot each process
+            y_ticks = []
+            y_labels = []
+            for i, (pid, intervals) in enumerate(sorted(processes.items())):
+                y_ticks.append(i)
+                y_labels.append(f'Process {pid}')
+
+                for start, end, queue in intervals:
+                    duration = end - start
+                    ax.barh(
+                        i, duration, left=start,
+                        color=colors.get(queue, '#95a5a6'),
+                        edgecolor='black',
+                        alpha=0.7
+                    )
+
+            # Customize the chart
+            ax.set_yticks(y_ticks)
+            ax.set_yticklabels(y_labels)
+            ax.set_xlabel('Time')
+            ax.set_ylabel('Process ID')
+            ax.set_title('Process Execution Gantt Chart')
+
+            # Add legend
+            legend_elements = [
+                plt.Rectangle(
+                    (0, 0), 1, 1,
+                    facecolor=color,
+                    edgecolor='black',
+                    alpha=0.7,
+                    label=queue
+                )
+                for queue, color in colors.items()
+            ]
+            ax.legend(handles=legend_elements, loc='upper right')
+
+            # Add grid
+            ax.grid(True, axis='x', alpha=0.3)
+
+            # Save the chart
+            plt.savefig('gantt_chart.png', bbox_inches='tight')
+            plt.close()
+
+            print("\nGantt chart saved as 'gantt_chart.png'")
+
+        except ImportError:
+            print("matplotlib is required for Gantt chart creation.")
+            print("Install it using: pip install matplotlib")
+            return
+        except Exception as e:
+            print(f"Error creating Gantt chart: {e}")
+            return
+
+    def load_process_to_memory(self, filepath: str, arrival_time: Optional[int] = None):
+        """
+        Load a process into memory and add it to the new queue.
+        Args:
+            filepath (str): Path to the program file
+            arrival_time (Optional[int], optional): Arrival time for the process.
+                Defaults to current clock time.
+
+        Returns:
+            PCB: Process Control Block if successful, None if failed
+        """
+        if arrival_time is None:
+            arrival_time = self.clock.time
+
+        # Read the file first to verify it exists
+        try:
+            with open(filepath, 'r', encoding='utf-8') as _:
+                self.print(f"Successfully verified file {filepath}")
+        except FileNotFoundError:
+            self.print(f"Error: File {filepath} not found")
+            return None
+        except IOError as e:
+            self.print(f"Error reading file {filepath}: {e}")
+            return None
+
+        # Prepare the program (analyze and get program info)
+        program_info = self.memory_manager.prepare_program(filepath)
+
+        if not program_info:
+            self.print(f"Error: Could not prepare program {filepath}")
+            return None
+
+        # Create PCB for the process
+        pcb = self.create_pcb(program_info, arrival_time)
+
+        # Check if memory is available
+        if not self.handle_check_memory_available(pcb):
+            self.print(f"Error: Not enough memory available for {pcb}")
+            return None
+
+        # Load process into memory
+        if not self.handle_load_to_memory(pcb):
+            self.print(f"Error: Failed to load {pcb} into memory")
+            return None
+
+        # Add to job queue
+        self.job_queue.append(pcb)
+        self.print(
+            f"Successfully loaded {pcb} into memory and added to job queue")
+
+        # Display state table if in verbose mode
+        if self.verbose:
+            self.display_state_table()
+
+        return pcb
+
+    def setschd(self, *args):
+        """Set the scheduling algorithm.
+        Args:
+            algorithm (str): The scheduling algorithm to use 
+                (MLFQ, RR, or FCFS)
+        """
+        try:
+            if not args:
+                algorithm = 'MLFQ'  # default
+            else:
+                algorithm = str(args[0]).strip().upper()  # Normalize input
+
+            if algorithm not in self.scheduler.scheduling_algorithms:
+                print(f"Invalid algorithm: {algorithm}")
+                print(f"Available: {self.scheduler.scheduling_algorithms}")
+                return
+
+            self.scheduler.scheduling_algorithm = algorithm
+            self.print(f"Set scheduling algorithm to {algorithm}")
+
+            # Set default quantums for MLFQ
+            if algorithm == 'MLFQ':
+                # Priority 0 (small quantum)
+                self.scheduler.q0_quantum = 1
+                # Priority 1 (medium quantum)
+                self.scheduler.q1_quantum = 2
+                # Priority 2 (FCFS - large quantum)
+                self.scheduler.q2_quantum = 100
+
+                # Initialize MLFQ specific attributes
+                self.scheduler.ready_queue_0 = []  # High priority
+                self.scheduler.ready_queue_1 = []  # Medium priority
+                self.scheduler.ready_queue_2 = []  # Low priority
+                self.scheduler.cpu_bursts = {}  # Track CPU bursts
+
+                # Move existing processes to high priority queue
+                while self.ready_queue:
+                    pcb = self.ready_queue.pop(0)
+                    self.scheduler.ready_queue_0.append(pcb)
+                    self.scheduler.cpu_bursts[pcb.pid] = 0
+                    self.print(f"Moved {pcb} to high priority queue")
+
+                self.print("Initialized MLFQ queues and parameters")
+
+        except Exception as e:
+            print(f"Error setting scheduling algorithm: {str(e)}")
+            return
+
+    def run_scheduler(self):
+        """Run processes according to the current scheduling algorithm.
+        For RR: Uses quantum settings from setRR
+        For MLFQ: Uses 3-level queue with different quantums
+        """
+        if not self.scheduler.jobs_in_any_queue():
+            print("No processes to run")
+            return
+
+        print(f"Running scheduler with {self.scheduler.scheduling_algorithm}")
+
+        # Initialize scheduler state
+        start_time = self.clock.time
+        self.scheduler.last_schedule_time = start_time
+
+        # Sort ready queues based on scheduling algorithm
+        algorithm = self.scheduler.scheduling_algorithm
+        if algorithm == 'MLFQ':
+            self.sort_ready_queue_mlfq()
+        elif algorithm == 'RR':
+            self.sort_ready_queue_rr()
+        else:
+            self.sort_ready_queue()
+
+        # Keep running until no more processes
+        while self.scheduler.jobs_in_any_queue():
+            self.scheduler.print_time()
+            self.scheduler.check_new_jobs()
+            self.scheduler.check_io_complete()
+
+            if self.scheduler.jobs_in_ready_queue():
+                # Get next process based on scheduling algorithm
+                if algorithm == 'MLFQ':
+                    next_pcb = self.scheduler.schedule_job_mlfq()
+                elif algorithm == 'RR':
+                    next_pcb = self.scheduler.schedule_job_rr()
+                else:
+                    next_pcb = self.scheduler.schedule_job()
+
+                # Handle the process state after running
+                if next_pcb:
+                    self.scheduler.handle_process_state(next_pcb)
+
+                if self.verbose:
+                    self.display_state_table()
+            else:
+                self.clock.time += 1
+                self.print("No jobs ready to run")
+
+        # Print final metrics
+        self.scheduler.print_metrics(start_time)
+        if self.verbose:
+            self.display_state_table()
+            self.create_gantt_chart()
+
+    # Wrapper methods for Scheduler's protected methods
+    def sort_ready_queue_mlfq(self):
+        """Wrapper for Scheduler's protected method."""
+        self.scheduler._sort_ready_queue_mlfq()
+
+    def sort_ready_queue_rr(self):
+        """Wrapper for Scheduler's protected method."""
+        self.scheduler._sort_ready_queue_rr()
+
+    def sort_ready_queue(self):
+        """Wrapper for Scheduler's protected method."""
+        self.scheduler._sort_ready_queue()
 
 
 if __name__ == '__main__':
