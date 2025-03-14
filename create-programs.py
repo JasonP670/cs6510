@@ -51,7 +51,7 @@ def generate_program_file(directory, file_name, lines, program_type):
 
 def make_line(program_type):
     """Returns a randomly generated assembly instruction based on program type."""
-    instruction_set = ("ADD R0 R0 R1", "SWI 20")
+    instruction_set = ("ADD R0 R0 R1", "SWI 21")
     probabilities = {
         "CPU": (9, 1),
         "IO": (5, 5)

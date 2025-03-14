@@ -61,6 +61,7 @@ class System:
             "terminated_queue": lambda: print(self.terminated_queue),
             'setSched': self.scheduler.set_strategy,
             'setRR': self.setRR,
+            'quantums': lambda: print(f"Q1: {self.Q1.get_quantum()}, Q2: {self.Q2.get_quantum()}"),
         }
 
     def switch_mode(self):
@@ -365,14 +366,5 @@ if __name__ == '__main__':
     system = System()
     system.verbose = True
     system.call('execute', 'programs/fork.osx', 0)
-    # system.handle_load('programs/add.osx')
-    # result = system.run_program('programs/add.osx')
-    # assert result == 2
 
 
-# SWI to simulate user input, add a random amount of time to the clock, or add a certain amount for each SWI and add multiple SWI
-# fork() parent should go to waiting state until all children are terminated
-# Given overlapping programs they should all run
-
-# draw gantt chart, generate a string 0 = waiting 1 = running
-# be able to track throughput, waiting time, turnaround time, response time

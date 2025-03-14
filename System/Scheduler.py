@@ -10,8 +10,9 @@ class SchedulingStrategy(Enum):
 class Scheduler:
     def __init__(self, system):
         self.system = system
-        self.scheduling_strategy = SchedulingStrategy.FCFS
+        self.scheduling_strategy = SchedulingStrategy.MLFQ
         self.mlfq_index = 0  # Add an index to track the current queue in MLfQ
+        self.check_promote_at = 5 # Times to run pcb before promoting/demoting
 
     def schedule_jobs(self):
         """ Schedule jobs in the system."""
@@ -22,6 +23,9 @@ class Scheduler:
             self.print_time()
             self.check_new_jobs()
             self.check_io_complete()
+
+            if self.system.clock == 80:
+                pass
 
             # Run the next job in the ready queue, FCFS
             if self.jobs_in_ready_queue():
@@ -87,16 +91,18 @@ class Scheduler:
                 # self.system.handle_free_memory(pcb)
                 self.system.terminated_queue.append(pcb)
             elif pcb.state == PCBState.WAITING:
-                wait_until = self.system.clock.time + random.randint(1, 50)
-                pcb.wait_until = wait_until
-                self.system.print(f"{pcb} waiting until {wait_until}")
-                self.system.io_queue.append(pcb)
+                if pcb.CPU_code == 21:
+                    pcb.wait_until = self.system.clock.time
+                    self.system.io_queue.append(pcb)
+                else:
+                    wait_until = self.system.clock.time + random.randint(1, 50)
+                    pcb.wait_until = wait_until
+                    self.system.print(f"{pcb} waiting until {wait_until}")
+                    self.system.io_queue.append(pcb)
+
             elif (pcb.state == PCBState.READY or pcb.state == PCBState.RUNNING):
-                # self.system.ready_queue.append(pcb)
-                pcb.ready(self.system.clock.time)
-                if (self.scheduling_strategy == SchedulingStrategy.FCFS or 
-                    self.scheduling_strategy == SchedulingStrategy.RR):
-                    self.system.Q1.add_process(pcb)
+                self.put_process_back(pcb)
+
             else:
                 self.system.print(f"Error: Invalid state {pcb.state} for {pcb}")
             
@@ -121,7 +127,9 @@ class Scheduler:
         for i, pcb in enumerate(self.system.io_queue):
             if self.system.clock.time >= pcb.wait_until:
                 self.system.io_queue.pop(i)
-                self.system.ready_queue.append(pcb)
+                self.put_process_back(pcb)
+                pcb.ready(self.system.clock.time)
+                # self.system.ready_queue.append(pcb)
                 self.system.print(f"IO complete for {pcb}")
 
     def print_metrics(self, start_time):
@@ -133,13 +141,13 @@ class Scheduler:
 
     def get_next_job(self):
         """ Get the next job in the ready queue."""
-        if self.scheduling_strategy == SchedulingStrategy.FCFS:
+        if (self.scheduling_strategy == SchedulingStrategy.FCFS or 
+            self.scheduling_strategy == SchedulingStrategy.RR):
             return self.system.Q1.get_process(), self.system.Q1.get_quantum()
-        elif self.scheduling_strategy == SchedulingStrategy.RR:
-            return self.system.Q1.get_process(), self.system.Q1.get_quantum()
+        
         elif self.scheduling_strategy == SchedulingStrategy.MLFQ:
             queues = [self.system.Q1, self.system.Q2, self.system.Q3]
-            for _ in range(len(queues)):
+            for _ in range(len(queues)): # Loop through all queues, getting one process from each
                 queue = queues[self.mlfq_index]
                 self.mlfq_index = (self.mlfq_index + 1) % len(queues)
                 if len(queue) > 0:
@@ -150,6 +158,8 @@ class Scheduler:
     def set_strategy(self, strategy):
         if len(self.system.Q1) > 0 or len(self.system.Q2) > 0 or len(self.system.Q3) > 0:
             raise ValueError("Cannot change scheduling strategy while jobs are in the system")
+        
+        strategy = strategy.upper()
         
         
         if strategy in SchedulingStrategy._value2member_map_:
@@ -171,6 +181,8 @@ class Scheduler:
         raise ValueError(f"Invalid scheduling strategy {strategy}")
     
     def put_process_back(self, pcb):
+        self.check_for_promotion(pcb)
+
         if pcb.queue_level == 1:
             self.system.Q1.add_process(pcb)
         elif pcb.queue_level == 2:
@@ -180,27 +192,40 @@ class Scheduler:
         else:
             raise ValueError(f"Invalid queue level {pcb.queue_level}")
         
+    def check_for_promotion(self, pcb):
+        if pcb.run_count == self.check_promote_at:
+            preemption_ratio = pcb.preempt_count / pcb.run_count
+
+            if preemption_ratio > 0.2: # If preempt more than 80% of the time, promote Q1 -> Q2 -> Q3
+                self.promote(pcb) 
+            elif preemption_ratio < 0.2:
+                self.demote(pcb)
+            else:
+                print("Something went wrong in put_process_back, preemption ratio: ", preemption_ratio)
+
+            pcb.preempt_count = 0
+            pcb.run_count = 0
+        
     def promote(self, pcb):
         if pcb.queue_level == 1:
             pcb.queue_level = 2
-            self.system.Q2.add_process(pcb)
+            self.system.print(f"Promoting {pcb} to Q2")
         elif pcb.queue_level == 2:
             pcb.queue_level = 3
-            self.system.Q3.add_process(pcb)
+            self.system.print(f"Promoting {pcb} to Q3")
         elif pcb.queue_level == 3:
-            self.system.Q3.add_process(pcb)
+            pcb.queue_level = 3
         else:
             raise ValueError(f"Invalid queue level {pcb.queue_level}")
         
     def demote(self, pcb):
         if pcb.queue_level == 1:
-            self.system.Q1.add_process(pcb)
+            pcb.queue_level = 1
         elif pcb.queue_level == 2:
             pcb.queue_level = 1
-            self.system.Q1.add_process(pcb)
+            self.system.print(f"Demoting {pcb} to Q1")
         elif pcb.queue_level == 3:
             pcb.queue_level = 2
-            self.system.Q2.add_process(pcb)
         else:
             raise ValueError(f"Invalid queue level {pcb.queue_level}")
     

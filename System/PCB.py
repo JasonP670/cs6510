@@ -40,6 +40,8 @@ class PCB:
         self.run_count = 0
         self.preempt_count = 0
 
+        self.CPU_code = None
+
     def __str__(self):
         return f"PCB(pid={self.pid}, file={self.file}, state={self.state.name})"
         

@@ -63,7 +63,7 @@ class CPU:
     
     def run_program(self, pcb, quantum, verbose=False):
         # pcb['start_time'] = self.system.clock.time
-        if verbose: self.verbose = True
+        # if verbose: self.verbose = True
 
         # Restor CPU state from PCB
         self.pcb = pcb
@@ -78,8 +78,7 @@ class CPU:
             opcode, operands = self._decode(instruction)
 
 
-            if not self._execute(opcode, operands, pcb):
-                break
+            self._execute(opcode, operands, pcb)
 
             time_slice += 1
             self.system.clock.increment()
@@ -93,10 +92,8 @@ class CPU:
                 
 
             if time_slice == quantum:
-                pcb.registers = self.registers.copy()
-                pcb.pc = self.registers[self.pc]
-                self.verbose = False
-                self.running = False
+                self.preempt(pcb)
+                
 
 
     def _execute(self, opcode, operands, pcb):
@@ -114,11 +111,21 @@ class CPU:
             self.verbose = False
             self.running = False
             return False
+        
+    def preempt(self, pcb):
+        pcb.registers = self.registers.copy()
+        pcb.pc = self.registers[self.pc]
+        pcb.preempt_count += 1
+        self.verbose = False
+        self.running = False
+        pcb.ready(self.system.clock.time)
 
     def _swi(self, operands, pcb):
         swi = int(operands[0])
+
         if self.verbose:
             print(f"\tSWI\t{swi}")
+            
         if swi == 1: # End of file
             pcb.registers = self.registers.copy()
             pcb.terminated(self.system.clock.time)
@@ -127,21 +134,31 @@ class CPU:
                 print("\tEnd of program")
             self.verbose = False
             self.running = False
-            return False
+            # return False
         
         elif swi == 2: # Print result (register 0)
             print(f'Result of operations: {self.registers[0]}')
 
         elif swi == 20: # Wait for IO
-            pcb['registers'] = self.registers.copy()
-            pcb['pc'] = self.registers[self.pc]
+            pcb.registers = self.registers.copy()
+            pcb.pc = self.registers[self.pc]
 
             pcb.waiting()
             if self.verbose:
                 print("Waiting for IO")
             self.verbose = False
             self.running = False
-            return False
+            # return False
+
+        elif swi == 21: # Return to ready queue, no wait
+            pcb.registers = self.registers.copy()
+            pcb.pc = self.registers[self.pc]
+            pcb.waiting()
+            pcb.CPU_code = 21
+            if self.verbose:
+                print("Returning to ready queue")
+            self.verbose = False
+            self.running = False
             
 
 
