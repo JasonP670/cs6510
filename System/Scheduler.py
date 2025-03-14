@@ -24,9 +24,6 @@ class Scheduler:
             self.check_new_jobs()
             self.check_io_complete()
 
-            if self.system.clock == 80:
-                pass
-
             # Run the next job in the ready queue, FCFS
             if self.jobs_in_ready_queue():
                 pcb, quantum = self.get_next_job()
@@ -88,12 +85,15 @@ class Scheduler:
         """ Handle the state of the process after running."""
         if pcb:
             if pcb.state == PCBState.TERMINATED:
-                # self.system.handle_free_memory(pcb)
                 self.system.terminated_queue.append(pcb)
+
             elif pcb.state == PCBState.WAITING:
                 if pcb.CPU_code == 21:
                     pcb.wait_until = self.system.clock.time
                     self.system.io_queue.append(pcb)
+                    self.system.io_queue.pop()
+                    pcb.ready(self.system.clock.time)
+                    self.put_process_back(pcb)
                 else:
                     wait_until = self.system.clock.time + random.randint(1, 50)
                     pcb.wait_until = wait_until
@@ -129,7 +129,6 @@ class Scheduler:
                 self.system.io_queue.pop(i)
                 self.put_process_back(pcb)
                 pcb.ready(self.system.clock.time)
-                # self.system.ready_queue.append(pcb)
                 self.system.print(f"IO complete for {pcb}")
 
     def print_metrics(self, start_time):
