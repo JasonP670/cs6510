@@ -36,6 +36,10 @@ class PCB:
         # Children
         self.children = []
 
+        self.queue_level = 1
+        self.run_count = 0
+        self.preempt_count = 0
+
     def __str__(self):
         return f"PCB(pid={self.pid}, file={self.file}, state={self.state.name})"
         

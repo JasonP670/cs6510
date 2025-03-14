@@ -9,6 +9,7 @@ try:
     from .PCB import PCB
     from .Scheduler import Scheduler
     from .MemoryManager import MemoryManager
+    from .Queue import Queue
 except ImportError:
     sys.path.append(
         os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -18,6 +19,7 @@ except ImportError:
     from PCB import PCB
     from Scheduler import Scheduler
     from MemoryManager import MemoryManager
+    from Queue import Queue
 
 from constants import USER_MODE, KERNEL_MODE, SYSTEM_CODES, PCBState, CHILD_EXEC_PROGRAM
 
@@ -41,6 +43,10 @@ class System:
         self.io_queue = []
         self.terminated_queue = []
 
+        self.Q1 = Queue()
+        self.Q2 = Queue()
+        self.Q3 = Queue()
+
         self.commands = {
             'load': self.handle_load,
             'coredump': self.coredump,
@@ -53,6 +59,8 @@ class System:
             "ready_queue": lambda: print(self.ready_queue),
             "io_queue": lambda: print(self.io_queue),
             "terminated_queue": lambda: print(self.terminated_queue),
+            'setSched': self.scheduler.set_strategy,
+            'setRR': self.setRR,
         }
 
     def switch_mode(self):
@@ -126,11 +134,11 @@ class System:
 
         return pcb
 
-    def run_pcb(self, pcb):
+    def run_pcb(self, pcb, quantum):
         pcb.running()
         self.print(f"Running program: {pcb}")
 
-        self.CPU.run_program(pcb, self.verbose)
+        self.CPU.run_program(pcb, quantum, self.verbose)
 
     def handle_load(self, filepath):
         program_info = self.memory_manager.prepare_program(filepath)
@@ -334,6 +342,10 @@ class System:
         add_queue_entries("Ready Queue", self.ready_queue)
         add_queue_entries("I/O Queue", self.io_queue)
         add_queue_entries("Terminated", self.terminated_queue)
+        add_queue_entries("Q1", self.Q1.processes)
+        add_queue_entries("Q2", self.Q2.processes)
+        add_queue_entries("Q3", self.Q3.processes)
+        
 
         # Sort by PID for consistent display
         table_data.sort(key=lambda x: x[0])
@@ -341,6 +353,12 @@ class System:
         print("\nSystem State Table:")
         print(tabulate(table_data, headers=headers, tablefmt="grid"))
         print()
+
+    def setRR(self, *args):
+        quantum1 = int(args[0])
+        quantum2 = int(args[1])
+        self.Q1.set_quantum(quantum1)
+        self.Q2.set_quantum(quantum2)
 
 
 if __name__ == '__main__':

@@ -61,7 +61,7 @@ class CPU:
     #     if verbose: self.verbose = True
     #     self.setPC(pcb['start_line'])
     
-    def run_program(self, pcb, verbose=False):
+    def run_program(self, pcb, quantum, verbose=False):
         # pcb['start_time'] = self.system.clock.time
         if verbose: self.verbose = True
 
@@ -71,6 +71,7 @@ class CPU:
         self.registers[self.pc] = pcb.pc
 
         self.running = True
+        time_slice = 0
 
         while self.running and self.registers[self.pc] < pcb['code_end']:
             instruction = self._fetch()
@@ -80,6 +81,7 @@ class CPU:
             if not self._execute(opcode, operands, pcb):
                 break
 
+            time_slice += 1
             self.system.clock.increment()
             pcb.execution_time += 1
 
@@ -88,6 +90,14 @@ class CPU:
                 print("End of memory reached")
                 self.verbose = False
                 break
+                
+
+            if time_slice == quantum:
+                pcb.registers = self.registers.copy()
+                pcb.pc = self.registers[self.pc]
+                self.verbose = False
+                self.running = False
+
 
     def _execute(self, opcode, operands, pcb):
         if opcode == "SWI":

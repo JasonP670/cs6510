@@ -1,12 +1,17 @@
 import random
 from constants import PCBState
+from enum import Enum
+
+class SchedulingStrategy(Enum):
+    FCFS = 'FCFS'
+    RR = 'RR'
+    MLFQ = 'MLFQ'
 
 class Scheduler:
     def __init__(self, system):
         self.system = system
-        self.scheduling_algorithms = ['FCFS', 'SJF', 'RR', 'Priority']
-        self.scheduling_algorithm = 'FCFS'
-
+        self.scheduling_strategy = SchedulingStrategy.FCFS
+        self.mlfq_index = 0  # Add an index to track the current queue in MLfQ
 
     def schedule_jobs(self):
         """ Schedule jobs in the system."""
@@ -20,7 +25,9 @@ class Scheduler:
 
             # Run the next job in the ready queue, FCFS
             if self.jobs_in_ready_queue():
-                pcb = self.schedule_job()
+                pcb, quantum = self.get_next_job()
+                self.run_process(pcb, quantum)
+                # pcb = self.schedule_job()
                 self.handle_process_state(pcb)
                 if self.system.verbose:
                     self.system.display_state_table()
@@ -42,13 +49,23 @@ class Scheduler:
             # Ensure memory is available without overlapping with other processes
             if self.system.handle_check_memory_available(pcb):
                 if self.system.handle_load_to_memory(pcb):
-                    self.system.ready_queue.append(self.system.job_queue.pop(i)) # move job from job queue to ready queue
+                    self.system.Q1.add_process(self.system.job_queue.pop(i))
+                    # self.system.ready_queue.append(self.system.job_queue.pop(i)) # move job from job queue to ready queue
                 else:
                     self.system.print(f"Error loading {pcb} to memory")
                     return None
             else:
                 i += 1
+
+    def get_process(self):
+        if self.scheduling_strategy == SchedulingStrategy.FCFS:
+            return self.system.ready_queue.pop(0)
         
+    def run_process(self, pcb, quantum):
+        pcb.ready(self.system.clock.time)
+        pcb.run_count += 1
+        self.system.print(f"\nScheduling {pcb}")
+        self.system.run_pcb(pcb, quantum)
 
     def schedule_job(self):
         """ Schedule the next job in the ready queue."""
@@ -74,8 +91,12 @@ class Scheduler:
                 pcb.wait_until = wait_until
                 self.system.print(f"{pcb} waiting until {wait_until}")
                 self.system.io_queue.append(pcb)
-            elif pcb.state == PCBState.READY:
-                self.system.ready_queue.append(pcb)
+            elif (pcb.state == PCBState.READY or pcb.state == PCBState.RUNNING):
+                # self.system.ready_queue.append(pcb)
+                pcb.ready(self.system.clock.time)
+                if (self.scheduling_strategy == SchedulingStrategy.FCFS or 
+                    self.scheduling_strategy == SchedulingStrategy.RR):
+                    self.system.Q1.add_process(pcb)
             else:
                 self.system.print(f"Error: Invalid state {pcb.state} for {pcb}")
             
@@ -85,11 +106,16 @@ class Scheduler:
 
     def jobs_in_ready_queue(self):
         """ Check if there are jobs in the ready queue."""
-        return self.system.ready_queue
+        return (len(self.system.Q1) + 
+                len(self.system.Q2) + 
+                len(self.system.Q3)) > 0
     
     def jobs_in_any_queue(self):
         """ Check if there are jobs in the system."""
-        return self.system.job_queue or self.system.ready_queue or self.system.io_queue
+        return (self.jobs_in_ready_queue() or
+                (len(self.system.job_queue) + 
+                len(self.system.ready_queue) + 
+                len(self.system.io_queue)) > 0)
 
     def check_io_complete(self):
         for i, pcb in enumerate(self.system.io_queue):
@@ -104,3 +130,78 @@ class Scheduler:
         total_waiting_time = sum([pcb.waiting_time for pcb in self.system.terminated_queue])
         average_waiting_time = total_waiting_time / n_jobs
         print(f"\n{n_jobs} jobs completed in {end_time - start_time} time units (start: {start_time}, end: {end_time})\nThroughput: {n_jobs / (end_time - start_time)}\nAverage waiting time: {average_waiting_time}")
+
+    def get_next_job(self):
+        """ Get the next job in the ready queue."""
+        if self.scheduling_strategy == SchedulingStrategy.FCFS:
+            return self.system.Q1.get_process(), self.system.Q1.get_quantum()
+        elif self.scheduling_strategy == SchedulingStrategy.RR:
+            return self.system.Q1.get_process(), self.system.Q1.get_quantum()
+        elif self.scheduling_strategy == SchedulingStrategy.MLFQ:
+            queues = [self.system.Q1, self.system.Q2, self.system.Q3]
+            for _ in range(len(queues)):
+                queue = queues[self.mlfq_index]
+                self.mlfq_index = (self.mlfq_index + 1) % len(queues)
+                if len(queue) > 0:
+                    return queue.get_process(), queue.get_quantum()
+        else:
+            raise ValueError(f"Invalid scheduling strategy {self.scheduling_strategy}")
+
+    def set_strategy(self, strategy):
+        if len(self.system.Q1) > 0 or len(self.system.Q2) > 0 or len(self.system.Q3) > 0:
+            raise ValueError("Cannot change scheduling strategy while jobs are in the system")
+        
+        
+        if strategy in SchedulingStrategy._value2member_map_:
+            if strategy == SchedulingStrategy.FCFS.value:
+                self.system.Q1.set_quantum(1000000)
+                self.scheduling_strategy = SchedulingStrategy.FCFS
+            elif strategy == SchedulingStrategy.RR.value:
+                self.system.Q1.set_quantum(10)
+                self.scheduling_strategy = SchedulingStrategy.RR
+            elif strategy == SchedulingStrategy.MLFQ.value:
+                self.system.Q1.set_quantum(8)
+                self.system.Q2.set_quantum(16)
+                self.scheduling_strategy = SchedulingStrategy.MLFQ
+            
+            self.system.print(f"Setting scheduling strategy to {strategy}")
+            return True
+        
+        
+        raise ValueError(f"Invalid scheduling strategy {strategy}")
+    
+    def put_process_back(self, pcb):
+        if pcb.queue_level == 1:
+            self.system.Q1.add_process(pcb)
+        elif pcb.queue_level == 2:
+            self.system.Q2.add_process(pcb)
+        elif pcb.queue_level == 3:
+            self.system.Q3.add_process(pcb)
+        else:
+            raise ValueError(f"Invalid queue level {pcb.queue_level}")
+        
+    def promote(self, pcb):
+        if pcb.queue_level == 1:
+            pcb.queue_level = 2
+            self.system.Q2.add_process(pcb)
+        elif pcb.queue_level == 2:
+            pcb.queue_level = 3
+            self.system.Q3.add_process(pcb)
+        elif pcb.queue_level == 3:
+            self.system.Q3.add_process(pcb)
+        else:
+            raise ValueError(f"Invalid queue level {pcb.queue_level}")
+        
+    def demote(self, pcb):
+        if pcb.queue_level == 1:
+            self.system.Q1.add_process(pcb)
+        elif pcb.queue_level == 2:
+            pcb.queue_level = 1
+            self.system.Q1.add_process(pcb)
+        elif pcb.queue_level == 3:
+            pcb.queue_level = 2
+            self.system.Q2.add_process(pcb)
+        else:
+            raise ValueError(f"Invalid queue level {pcb.queue_level}")
+    
+
