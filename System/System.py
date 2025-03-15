@@ -62,6 +62,8 @@ class System:
             'setSched': self.scheduler.set_strategy,
             'setRR': self.setRR,
             'quantums': lambda: print(f"Q1: {self.Q1.get_quantum()}, Q2: {self.Q2.get_quantum()}"),
+            'gantt': lambda: self.scheduler.plot_gantt_chart(True),
+            'reset': self.reset,
         }
 
     def switch_mode(self):
@@ -360,6 +362,20 @@ class System:
         quantum2 = int(args[1])
         self.Q1.set_quantum(quantum1)
         self.Q2.set_quantum(quantum2)
+
+    def reset(self):
+        self.clock.reset()
+        self.scheduler.reset()
+        self.memory_manager.reset()
+        self.CPU.reset()
+        self.job_queue = []
+        self.ready_queue = []
+        self.io_queue = []
+        self.terminated_queue = []
+        self.pid = 0
+        self.errors = []
+        self.verbose = False
+        self.print("System reset.")
 
 
 if __name__ == '__main__':

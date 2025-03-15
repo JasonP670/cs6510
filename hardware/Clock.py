@@ -27,3 +27,6 @@ class Clock:
     def increment(self):
         self.time += 1
         return self
+    
+    def reset(self):
+        self.time = 0

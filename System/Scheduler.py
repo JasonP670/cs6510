@@ -1,6 +1,7 @@
 import random
 from constants import PCBState
 from enum import Enum
+import matplotlib.pyplot as plt
 
 class SchedulingStrategy(Enum):
     FCFS = 'FCFS'
@@ -13,6 +14,7 @@ class Scheduler:
         self.scheduling_strategy = SchedulingStrategy.MLFQ
         self.mlfq_index = 0  # Add an index to track the current queue in MLfQ
         self.check_promote_at = 5 # Times to run pcb before promoting/demoting
+        self.gantt_chart = []
 
     def schedule_jobs(self):
         """ Schedule jobs in the system."""
@@ -27,17 +29,22 @@ class Scheduler:
             # Run the next job in the ready queue, FCFS
             if self.jobs_in_ready_queue():
                 pcb, quantum = self.get_next_job()
+                start_time = self.system.clock.time
                 self.run_process(pcb, quantum)
-                # pcb = self.schedule_job()
+                end_time = self.system.clock.time
+                self.add_to_gantt_chart(pcb, start_time, end_time)                
                 self.handle_process_state(pcb)
                 if self.system.verbose:
                     self.system.display_state_table()
             else:
                 # If no job is ready increment clock
+                self.gantt_chart.append((self.system.clock.time, 'IDLE', None))
                 self.system.clock += 1
                 self.system.print("No jobs ready to run")
+
         self.print_metrics(start_time)
-        
+        # self.print_gantt_chart()
+        self.plot_gantt_chart()
 
     def check_new_jobs(self):
         """ Move jobs from job queue to ready queue, if current time is past programs arrival time."""
@@ -138,6 +145,68 @@ class Scheduler:
         average_waiting_time = total_waiting_time / n_jobs
         print(f"\n{n_jobs} jobs completed in {end_time - start_time} time units (start: {start_time}, end: {end_time})\nThroughput: {n_jobs / (end_time - start_time)}\nAverage waiting time: {average_waiting_time}")
 
+    def add_to_gantt_chart(self, pcb, start_time, end_time):
+        self.gantt_chart.append((start_time, end_time, pcb.pid, pcb.queue_level))
+
+    def print_gantt_chart(self):
+        gantt_string = ''
+        for i, (time, pid, queue) in enumerate(self.gantt_chart):
+            gantt_string += f"{pid}"
+            if i < len(self.gantt_chart) - 1:
+                gantt_string += ', '
+        print(gantt_string)
+
+    def plot_gantt_chart(self, show=False):
+
+        color_map = {
+            'IDLE': '#A0A0A0',
+            1: '#4682B4',
+            2: '#8FBC8F',
+            3: '#D2691E'
+        }
+
+        fig, ax = plt.subplots(figsize=(12, 5))
+        process_intervals = {}
+        process_queues = {}
+
+        for start_time, end_time, pid, queue_level in self.gantt_chart:
+            if pid not in process_intervals:
+                process_intervals[pid] = []
+
+            # if not process_intervals[pid] or process_intervals[pid][-1][1] != time - 1:
+            #     process_intervals[pid].append([time, time])
+            process_intervals[pid].append((start_time, end_time, queue_level))
+
+
+        sorted_processes = ['IDLE'] + sorted([p for p in process_intervals.keys() if p != 'IDLE'])
+        process_positions = {pid: i for i, pid in enumerate(sorted_processes)}
+
+        ax.set_title('Gantt Chart') 
+        ax.set_xlabel('Time')
+        ax.set_ylabel('Processes')
+        ax.set_yticks(range(len(process_positions)))
+        ax.set_yticklabels(process_positions.keys())
+
+        
+
+        for pid, intervals in process_intervals.items():
+            for start, end, queue in intervals:
+                color = color_map.get(queue, color_map['IDLE'])
+                ax.barh(process_positions[pid], end - start, left=start, height=0.4, color=color, label=f'Q{queue}')
+                
+
+        # Remove duplicate labels and add grid lines
+        handles, labels = ax.get_legend_handles_labels()
+        by_label = dict(zip(labels, handles))  # Remove duplicates
+        ax.legend(by_label.values(), by_label.keys())
+        plt.grid(axis='x', linestyle='--', alpha=0.6)
+        
+        plt.savefig('gantt_chart.png')
+
+        if show:
+            plt.show()
+
+
     def get_next_job(self):
         """ Get the next job in the ready queue."""
         if (self.scheduling_strategy == SchedulingStrategy.FCFS or 
@@ -180,7 +249,8 @@ class Scheduler:
         raise ValueError(f"Invalid scheduling strategy {strategy}")
     
     def put_process_back(self, pcb):
-        self.check_for_promotion(pcb)
+        if self.scheduling_strategy == SchedulingStrategy.MLFQ:
+            self.check_for_promotion(pcb)
 
         if pcb.queue_level == 1:
             self.system.Q1.add_process(pcb)
@@ -199,8 +269,8 @@ class Scheduler:
                 self.promote(pcb) 
             elif preemption_ratio < 0.2:
                 self.demote(pcb)
-            else:
-                print("Something went wrong in put_process_back, preemption ratio: ", preemption_ratio)
+            # else:
+            #     print("Something went wrong in put_process_back, preemption ratio: ", preemption_ratio)
 
             pcb.preempt_count = 0
             pcb.run_count = 0
