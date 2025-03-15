@@ -36,6 +36,7 @@ class System:
         self.errors = []
         self.system_codes = SYSTEM_CODES
         self.pid = 0
+        self.execution_history = []  # List to store process execution history
 
         # Process management queues
         self.ready_queue = []
@@ -62,6 +63,7 @@ class System:
             'setSched': self.scheduler.set_strategy,
             'setRR': self.setRR,
             'quantums': lambda: print(f"Q1: {self.Q1.get_quantum()}, Q2: {self.Q2.get_quantum()}"),
+            'gantt': self.display_gantt_chart
         }
 
     def switch_mode(self):
@@ -106,13 +108,13 @@ class System:
             arrival_time = int(args[i+1])
 
             program_info = self.memory_manager.prepare_program(filepath)
-            
+
             if program_info:
                 pcb = self.create_pcb(program_info, arrival_time)
                 self.job_queue.append(pcb)
             else:
                 return None
-        
+
         self.print("Programs added to job queue.")
         if self.verbose:
             self.display_state_table()
@@ -139,7 +141,18 @@ class System:
         pcb.running()
         self.print(f"Running program: {pcb}")
 
+        # Record execution start
+        start_time = self.clock.time
+
         self.CPU.run_program(pcb, quantum, self.verbose)
+
+        # Record execution history
+        self.execution_history.append({
+            'pid': pcb.pid,
+            'start_time': start_time,
+            'end_time': self.clock.time,
+            'quantum': quantum
+        })
 
     def handle_load(self, filepath):
         program_info = self.memory_manager.prepare_program(filepath)
@@ -159,7 +172,7 @@ class System:
             print(e)
 
         return False
-    
+
     def handle_load_to_memory(self, pcb):
         try:
             if self.memory_manager.load_to_memory(pcb):
@@ -168,7 +181,7 @@ class System:
             print(e)
 
         return False
-    
+
     def handle_free_memory(self, pcb):
         if self.memory_manager.free_memory(pcb):
             self.print(f"Memory freed for {pcb}")
@@ -197,7 +210,7 @@ class System:
                 break
         self.job_queue.remove(pcb)
         self.print(f"Running program: {pcb}")
-        
+
         pcb.start_time = self.clock.time
         self.CPU.run_program(pcb, self.verbose)
 
@@ -288,7 +301,7 @@ class System:
         # arrival_time = self.clock.time
 
         program_info = self.memory_manager.prepare_program(filepath)
-        
+
         if program_info:
             pcb.file = program_info['filepath']
             pcb.loader = program_info['loader']
@@ -307,7 +320,8 @@ class System:
 
     def wait(self, pcb):
         if any([child_pcb.state != PCBState.TERMINATED for child_pcb in pcb.get_children()]):
-            self.print(f"Parent process {pcb} is waiting for children to terminate")
+            self.print(
+                f"Parent process {pcb} is waiting for children to terminate")
             pcb.ready(self.clock.time)
             return
         msg = f"Parent process {pcb} has waited for all children to terminate"
@@ -346,7 +360,6 @@ class System:
         add_queue_entries("Q1", self.Q1.processes)
         add_queue_entries("Q2", self.Q2.processes)
         add_queue_entries("Q3", self.Q3.processes)
-        
 
         # Sort by PID for consistent display
         table_data.sort(key=lambda x: x[0])
@@ -361,10 +374,63 @@ class System:
         self.Q1.set_quantum(quantum1)
         self.Q2.set_quantum(quantum2)
 
+    def display_gantt_chart(self):
+        """
+        Display a horizontal Gantt chart showing process execution over time
+        """
+        if not self.execution_history:
+            print("No execution history available.")
+            return
+
+        # Find the maximum time to determine chart width
+        max_time = max(entry['end_time'] for entry in self.execution_history)
+
+        # Sort processes by start time
+        sorted_history = sorted(self.execution_history,
+                                key=lambda x: x['start_time'])
+
+        # Get unique PIDs to determine chart height
+        pids = sorted(set(entry['pid'] for entry in self.execution_history))
+
+        # Create the header with time markers
+        print("\nGantt Chart:")
+        print("PID |", end="")
+        for t in range(max_time + 1):
+            print(f"{t:2}", end="")
+        print("\n----|" + "-" * (2 * (max_time + 1)))
+
+        # Create timeline for each process
+        for pid in pids:
+            print(f"P{pid:2} |", end="")
+
+            # Fill the timeline
+            current_time = 0
+            while current_time <= max_time:
+                # Find if process was running at this time
+                running = False
+                quantum = None
+
+                for entry in sorted_history:
+                    if (entry['pid'] == pid and
+                            entry['start_time'] <= current_time < entry['end_time']):
+                        running = True
+                        quantum = entry['quantum']
+                        break
+
+                if running:
+                    print(f"{quantum}", end="")
+                else:
+                    print(" .", end="")
+                current_time += 1
+            print()  # New line after each process
+
+        # Print legend
+        print("\nLegend:")
+        print("  . = Idle")
+        print("  # = Number shown is quantum value used")
+
 
 if __name__ == '__main__':
     system = System()
     system.verbose = True
     system.call('execute', 'programs/fork.osx', 0)
-
-
