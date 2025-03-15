@@ -28,7 +28,7 @@ def main():
 def create_programs(size_key):
     # Get info
     size = SIZES[size_key]
-    qty, lines, display_name = size['qty'], size['lines'], size['display_name']
+    qty, lines, display_name = size['qty'], size['lines'] - 3, size['display_name']
     directory = f"programs/milestone_3"
     
     os.makedirs(directory, exist_ok=True) # Ensure directory exists
@@ -62,16 +62,20 @@ def make_line(program_type):
 
 def compile_programs():
     """ Compiles all generated assembly programs """
+    pos = 0
     for size_key, size in SIZES.items():
-        pos = 10
         display_name = size['display_name']
         directory = f"programs/milestone_3"
         for i in range(size['qty']):
+            lines = size['lines']
             cpu_file = f"{directory}/{display_name}-CPU-{i+1}.asm"
             io_file = f"{directory}/{display_name}-IO-{i+1}.asm"
             os.system(f"osx {cpu_file} {pos}")
+            bites = lines * 6
+            pos += bites + 10
             os.system(f"osx {io_file} {pos}")
-            pos += size['lines'] + 10
+            bites = lines * 6
+            pos += bites + 10
 
 
 

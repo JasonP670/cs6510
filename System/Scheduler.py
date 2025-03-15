@@ -29,10 +29,10 @@ class Scheduler:
             # Run the next job in the ready queue, FCFS
             if self.jobs_in_ready_queue():
                 pcb, quantum = self.get_next_job()
-                start_time = self.system.clock.time
+                run_start_time = self.system.clock.time
                 self.run_process(pcb, quantum)
-                end_time = self.system.clock.time
-                self.add_to_gantt_chart(pcb, start_time, end_time)                
+                run_end_time = self.system.clock.time
+                self.add_to_gantt_chart(pcb, run_start_time, run_end_time)                
                 self.handle_process_state(pcb)
                 if self.system.verbose:
                     self.system.display_state_table()
@@ -42,9 +42,12 @@ class Scheduler:
                 self.system.clock += 1
                 self.system.print("No jobs ready to run")
 
-        self.print_metrics(start_time)
+        metrics = self.get_metrics(start_time)
+        # self.system.print(f"\n{metrics['n_jobs']} jobs completed in {metrics['runtime']} time units (start: {metrics['start_time']}, end: {metrics['end_time']})\nThroughput: {metrics['turnaround']}\nAverage waiting time: {metrics['average_waiting_time']}")
+
         # self.print_gantt_chart()
         self.plot_gantt_chart()
+        return metrics
 
     def check_new_jobs(self):
         """ Move jobs from job queue to ready queue, if current time is past programs arrival time."""
@@ -138,12 +141,18 @@ class Scheduler:
                 pcb.ready(self.system.clock.time)
                 self.system.print(f"IO complete for {pcb}")
 
-    def print_metrics(self, start_time):
+    def get_metrics(self, start_time):
         end_time = self.system.clock.time
         n_jobs = len(self.system.terminated_queue)
         total_waiting_time = sum([pcb.waiting_time for pcb in self.system.terminated_queue])
         average_waiting_time = total_waiting_time / n_jobs
-        print(f"\n{n_jobs} jobs completed in {end_time - start_time} time units (start: {start_time}, end: {end_time})\nThroughput: {n_jobs / (end_time - start_time)}\nAverage waiting time: {average_waiting_time}")
+        return {'n_jobs': n_jobs, 
+                'runtime': end_time - start_time, 
+                'turnaround': n_jobs / (end_time - start_time), 
+                'avg_wait_time': average_waiting_time,
+                'start_time': start_time,
+                'end_time': end_time}
+    
 
     def add_to_gantt_chart(self, pcb, start_time, end_time):
         self.gantt_chart.append((start_time, end_time, pcb.pid, pcb.queue_level))
