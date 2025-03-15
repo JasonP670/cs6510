@@ -1,2 +1,4 @@
 *.pyc
 programs/milestone_3/
+charts/gantt_charts/*.png
+charts/*.png

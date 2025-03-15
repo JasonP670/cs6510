@@ -1,5 +1,6 @@
 from constants import instructions
 import struct
+from struct import unpack
 
 
 class CPU:
@@ -73,6 +74,7 @@ class CPU:
         self.running = True
         time_slice = 0
 
+
         while self.running and self.registers[self.pc] < pcb['code_end']:
             instruction = self._fetch()
             opcode, operands = self._decode(instruction)
@@ -91,7 +93,7 @@ class CPU:
                 break
                 
 
-            if time_slice == quantum:
+            if time_slice == quantum and self.running :
                 self.preempt(pcb)
                 
 

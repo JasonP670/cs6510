@@ -2,6 +2,7 @@ import random
 from constants import PCBState
 from enum import Enum
 import matplotlib.pyplot as plt
+import datetime
 
 class SchedulingStrategy(Enum):
     FCFS = 'FCFS'
@@ -25,6 +26,7 @@ class Scheduler:
             self.print_time()
             self.check_new_jobs()
             self.check_io_complete()
+
 
             # Run the next job in the ready queue, FCFS
             if self.jobs_in_ready_queue():
@@ -145,11 +147,18 @@ class Scheduler:
         end_time = self.system.clock.time
         n_jobs = len(self.system.terminated_queue)
         total_waiting_time = sum([pcb.waiting_time for pcb in self.system.terminated_queue])
+        total_response_time = sum([pcb.response_time for pcb in self.system.terminated_queue])
+        total_turnaround_time = sum([pcb.turnaround_time for pcb in self.system.terminated_queue])
         average_waiting_time = total_waiting_time / n_jobs
+        average_response_time = total_response_time / n_jobs
+        average_turnaround_time = total_turnaround_time / n_jobs
+
         return {'n_jobs': n_jobs, 
                 'runtime': end_time - start_time, 
-                'turnaround': n_jobs / (end_time - start_time), 
+                'avg_turnaround': average_turnaround_time,
+                'throughput': n_jobs / (end_time - start_time), 
                 'avg_wait_time': average_waiting_time,
+                'avg_response_time': average_response_time,
                 'start_time': start_time,
                 'end_time': end_time}
     
@@ -165,8 +174,8 @@ class Scheduler:
                 gantt_string += ', '
         print(gantt_string)
 
-    def plot_gantt_chart(self, show=False):
 
+    def plot_gantt_chart(self, show=False):
         color_map = {
             'IDLE': '#A0A0A0',
             1: '#4682B4',
@@ -190,7 +199,11 @@ class Scheduler:
         sorted_processes = ['IDLE'] + sorted([p for p in process_intervals.keys() if p != 'IDLE'])
         process_positions = {pid: i for i, pid in enumerate(sorted_processes)}
 
-        ax.set_title('Gantt Chart') 
+        program_size = self.system.terminated_queue[0].file.split('/')[2].split('-')[0]
+
+
+
+        ax.set_title(f'Gantt Chart - {self.scheduling_strategy.value} - {program_size} - Q1: {self.system.Q1.quantum}, Q2: {self.system.Q2.quantum}') 
         ax.set_xlabel('Time')
         ax.set_ylabel('Processes')
         ax.set_yticks(range(len(process_positions)))
@@ -210,8 +223,9 @@ class Scheduler:
         ax.legend(by_label.values(), by_label.keys())
         plt.grid(axis='x', linestyle='--', alpha=0.6)
         
-        plt.savefig('gantt_chart.png')
-
+        current_datetime = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+        plt.savefig(f'charts/gantt_charts/{self.scheduling_strategy.value}_{program_size}_{self.system.Q1.quantum}_{self.system.Q2.quantum}.png')
+        plt.close('all')
         if show:
             plt.show()
 
