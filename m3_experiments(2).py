@@ -3,13 +3,18 @@ import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from scipy.interpolate import griddata
+import datetime
+from ProgramCreator import ProgramCreator
 
 
 def main():
     size = ['S', 'M', 'L']
     prog_type = ['CPU', 'IO']
-    quantum_1s = [10, 20, 30]
-    quantum_ratios = [2, 3, 4]
+    quantum_1s = [2]
+    quantum_ratios = [2]
+
+    ProgramCreator().run()
+
 
 
     for s in size:
@@ -21,6 +26,12 @@ def main():
                 "response_time": [],
                 "quantum_1": [],
                 "quantum_2": []
+            }
+            best_configs = {
+                'min_waiting_time': {"value": float("inf"), "config": None},
+                'min_turnaround_time': {"value": float("inf"), "config": None},
+                # 'max_throughput': {"value": float("-inf"), "config": None},
+                'min_response_time': {"value": float("inf"), "config": None},
             }
             for quantum_1 in quantum_1s:
                 for ratio in quantum_ratios:
@@ -37,7 +48,8 @@ def main():
                         f"programs/milestone_3/{s}-{p}-3.osx",
                     ]
 
-                    prepare_program(system, programs)
+                    for program in programs:
+                        system.prepare_program(program, 0)
                     metrics = system.scheduler.schedule_jobs()
                     results["waiting_time"].append(metrics["avg_wait_time"])
                     results["turnaround_time"].append(metrics["avg_turnaround"])
@@ -45,13 +57,32 @@ def main():
                     results["response_time"].append(metrics["avg_response_time"])
                     results["quantum_1"].append(quantum_1)
                     results["quantum_2"].append(quantum_2)
-            plot_3d_graph(results, s, p)
 
-def prepare_program(system, programs):
-    for program in programs:
-        program_info = system.memory_manager.prepare_program(program)
-        pcb = system.create_pcb(program_info, 0)
-        system.job_queue.append(pcb)
+
+                    if metrics['avg_wait_time'] < best_configs['min_waiting_time']['value']:
+                        best_configs['min_waiting_time'] = {'value': metrics['avg_wait_time'], 'config': {'quantum_1': quantum_1, 'quantum_2': quantum_2}}
+
+                    if metrics['avg_turnaround'] < best_configs['min_turnaround_time']['value']:
+                        best_configs['min_turnaround_time'] = {'value': metrics['avg_turnaround'], 'config': {'quantum_1': quantum_1, 'quantum_2': quantum_2}}
+
+                    # if metrics['throughput'] > best_configs['max_throughput']['value']:
+                    #     best_configs['max_throughput'] = {'value': metrics['throughput'], 'config': {'quantum_1': quantum_1, 'quantum_2': quantum_2}}
+
+                    if metrics['avg_response_time'] < best_configs['min_response_time']['value']:
+                        best_configs['min_response_time'] = {'value': metrics['avg_response_time'], 'config': {'quantum_1': quantum_1, 'quantum_2': quantum_2}}
+
+                    
+                    with open(f'charts/{s}/{p}/BestConfig.txt', 'w') as f:
+                        f.write(f"Best Configurations for {s}-{p}\n")
+                        f.write(f"Min Waiting Time: {best_configs['min_waiting_time']['value']} - ({best_configs['min_waiting_time']['config']['quantum_1']}, {best_configs['min_waiting_time']['config']['quantum_2']})\n")
+                        f.write(f"Min Turnaround Time: {best_configs['min_turnaround_time']['value']} - ({best_configs['min_turnaround_time']['config']['quantum_1']}, {best_configs['min_turnaround_time']['config']['quantum_2']})\n")
+                        # f.write(f"Max Throughput: {best_configs['max_throughput']['value']} - ({best_configs['max_throughput']['config']['quantum_1']}, {best_configs['max_throughput']['config']['quantum_2']})\n")
+                        f.write(f"Min Response Time: {best_configs['min_response_time']['value']} - ({best_configs['min_response_time']['config']['quantum_1']}, {best_configs['min_response_time']['config']['quantum_2']})\n")
+
+            if len(quantum_1s) > 1:
+                plot_3d_graph(results, s, p)
+    print("========== DONE ==========")
+
 
 def plot_3d_graph(results, size, prog_type):
     fig = plt.figure(figsize=(14, 10))
@@ -84,11 +115,11 @@ def plot_3d_graph(results, size, prog_type):
         ax.set_title(f"{titles[i]} - {size}-{prog_type}")
     
     plt.tight_layout()
-    plt.savefig(f"charts/{size}-{prog_type}.png")
+    plt.savefig(f"charts/{size}/{prog_type}/graphs.png")
     plt.close(fig)
 
 
-
-
 if __name__ == "__main__":
+    start_time = datetime.datetime.now()
     main()
+    print(f"Execution Time: {datetime.datetime.now() - start_time}")

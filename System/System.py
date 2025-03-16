@@ -109,19 +109,23 @@ class System:
             filepath = args[i]
             arrival_time = int(args[i+1])
 
-            program_info = self.memory_manager.prepare_program(filepath)
-
-            if program_info:
-                pcb = self.create_pcb(program_info, arrival_time)
-                self.job_queue.append(pcb)
-            else:
-                return None
+            self.prepare_program(filepath, arrival_time)
 
         self.print("Programs added to job queue.")
         if self.verbose:
             self.display_state_table()
 
         self.scheduler.schedule_jobs()
+            
+
+    def prepare_program(self, filepath, arrival_time):
+        program_info = self.memory_manager.prepare_program(filepath)
+
+        if program_info:
+            pcb = self.create_pcb(program_info, arrival_time)
+            self.job_queue.append(pcb)
+        else:
+            return None
 
     def create_pcb(self, program_info, arrival_time):
         pid = self.pid + 1

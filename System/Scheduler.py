@@ -1,8 +1,9 @@
+import os
 import random
-from constants import PCBState
-from enum import Enum
-import matplotlib.pyplot as plt
 import datetime
+from enum import Enum
+from constants import PCBState
+import matplotlib.pyplot as plt
 
 class SchedulingStrategy(Enum):
     FCFS = 'FCFS'
@@ -16,10 +17,12 @@ class Scheduler:
         self.mlfq_index = 0  # Add an index to track the current queue in MLfQ
         self.check_promote_at = 5 # Times to run pcb before promoting/demoting
         self.gantt_chart = []
+        self.real_start_time = None
 
     def schedule_jobs(self):
         """ Schedule jobs in the system."""
         start_time = self.system.clock.time
+        self.real_start_time = datetime.datetime.now()
         self._sort_ready_queue()
 
         while self.jobs_in_any_queue(): # If theres programs one of the queues
@@ -48,7 +51,7 @@ class Scheduler:
         # self.system.print(f"\n{metrics['n_jobs']} jobs completed in {metrics['runtime']} time units (start: {metrics['start_time']}, end: {metrics['end_time']})\nThroughput: {metrics['turnaround']}\nAverage waiting time: {metrics['average_waiting_time']}")
 
         # self.print_gantt_chart()
-        self.plot_gantt_chart()
+        self.plot_gantt_chart(metrics)
         return metrics
 
     def check_new_jobs(self):
@@ -149,9 +152,9 @@ class Scheduler:
         total_waiting_time = sum([pcb.waiting_time for pcb in self.system.terminated_queue])
         total_response_time = sum([pcb.response_time for pcb in self.system.terminated_queue])
         total_turnaround_time = sum([pcb.turnaround_time for pcb in self.system.terminated_queue])
-        average_waiting_time = total_waiting_time / n_jobs
-        average_response_time = total_response_time / n_jobs
-        average_turnaround_time = total_turnaround_time / n_jobs
+        average_waiting_time = round(total_waiting_time / n_jobs, 2)
+        average_response_time = round(total_response_time / n_jobs, 2)
+        average_turnaround_time = round(total_turnaround_time / n_jobs, 2)
 
         return {'n_jobs': n_jobs, 
                 'runtime': end_time - start_time, 
@@ -175,7 +178,7 @@ class Scheduler:
         print(gantt_string)
 
 
-    def plot_gantt_chart(self, show=False):
+    def plot_gantt_chart(self, metrics, show=False):
         color_map = {
             'IDLE': '#A0A0A0',
             1: '#4682B4',
@@ -191,23 +194,20 @@ class Scheduler:
             if pid not in process_intervals:
                 process_intervals[pid] = []
 
-            # if not process_intervals[pid] or process_intervals[pid][-1][1] != time - 1:
-            #     process_intervals[pid].append([time, time])
             process_intervals[pid].append((start_time, end_time, queue_level))
 
 
         sorted_processes = ['IDLE'] + sorted([p for p in process_intervals.keys() if p != 'IDLE'])
         process_positions = {pid: i for i, pid in enumerate(sorted_processes)}
 
-        program_size = self.system.terminated_queue[0].file.split('/')[2].split('-')[0]
+        program_size, program_type, *_ = self.system.terminated_queue[0].file.split('/')[2].split('-')
 
-
-
-        ax.set_title(f'Gantt Chart - {self.scheduling_strategy.value} - {program_size} - Q1: {self.system.Q1.quantum}, Q2: {self.system.Q2.quantum}') 
+        ax.set_title(f'Gantt Chart - {self.scheduling_strategy.value} - {program_size} {program_type} - Q1: {self.system.Q1.quantum}, Q2: {self.system.Q2.quantum}') 
         ax.set_xlabel('Time')
         ax.set_ylabel('Processes')
         ax.set_yticks(range(len(process_positions)))
-        ax.set_yticklabels(process_positions.keys())
+        # ax.set_yticklabels(process_positions.keys())
+        ax.set_yticklabels(sorted_processes)
 
         
 
@@ -215,16 +215,29 @@ class Scheduler:
             for start, end, queue in intervals:
                 color = color_map.get(queue, color_map['IDLE'])
                 ax.barh(process_positions[pid], end - start, left=start, height=0.4, color=color, label=f'Q{queue}')
-                
 
         # Remove duplicate labels and add grid lines
         handles, labels = ax.get_legend_handles_labels()
         by_label = dict(zip(labels, handles))  # Remove duplicates
         ax.legend(by_label.values(), by_label.keys())
         plt.grid(axis='x', linestyle='--', alpha=0.6)
-        
-        current_datetime = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-        plt.savefig(f'charts/gantt_charts/{self.scheduling_strategy.value}_{program_size}_{self.system.Q1.quantum}_{self.system.Q2.quantum}.png')
+
+        # Add metrics to the figure
+        real_end_time = datetime.datetime.now()
+        real_runtime = real_end_time - self.real_start_time
+        if real_runtime.seconds < 1:
+            real_runtime = "< 1s"
+        else:
+            real_runtime = f"{real_runtime.seconds}s"
+        fig_text = f'Avg wait: {round(metrics["avg_wait_time"], 1)}\n' \
+           f'Avg resp: {round(metrics["avg_response_time"], 1)}\n' \
+           f'Avg turn: {round(metrics["avg_turnaround"], 1)}\n' \
+           f'Real time: {real_runtime}'
+        fig.text(0.95, 0.8, fig_text, ha='center', va='center')
+
+        directory = f'charts/{program_size}/{program_type}'
+        os.makedirs(directory, exist_ok=True)
+        plt.savefig(f'{directory}/{self.scheduling_strategy.value}_{program_size}_{program_type}_{self.system.Q1.quantum}_{self.system.Q2.quantum}.png')
         plt.close('all')
         if show:
             plt.show()
@@ -317,7 +330,7 @@ class Scheduler:
             pcb.queue_level = 1
             self.system.print(f"Demoting {pcb} to Q1")
         elif pcb.queue_level == 3:
-            pcb.queue_level = 2
+            pcb.queue_level = 3
         else:
             raise ValueError(f"Invalid queue level {pcb.queue_level}")
     
