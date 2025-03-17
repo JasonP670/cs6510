@@ -200,7 +200,15 @@ class Scheduler:
         sorted_processes = ['IDLE'] + sorted([p for p in process_intervals.keys() if p != 'IDLE'])
         process_positions = {pid: i for i, pid in enumerate(sorted_processes)}
 
-        program_size, program_type, *_ = self.system.terminated_queue[0].file.split('/')[2].split('-')
+        filepath = self.system.terminated_queue[0].file
+        parts = filepath.split('/')
+        if len(parts) > 1:
+            filename = parts[0]
+            program_size, program_type, *_ = parts[-1].split('-')
+        else:
+            program_size = 'manual'
+            program_type = 'CPU'
+
 
         ax.set_title(f'Gantt Chart - {self.scheduling_strategy.value} - {program_size} {program_type} - Q1: {self.system.Q1.quantum}, Q2: {self.system.Q2.quantum}') 
         ax.set_xlabel('Time')

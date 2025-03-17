@@ -10,8 +10,8 @@ from ProgramCreator import ProgramCreator
 def main():
     size = ['S', 'M', 'L']
     prog_type = ['CPU', 'IO']
-    quantum_1s = [2]
-    quantum_ratios = [2]
+    quantum_1s = [10, 20, 30]
+    quantum_ratios = [2, 3, 4]
 
     ProgramCreator().run()
 
