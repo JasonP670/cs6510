@@ -6,7 +6,7 @@ CS6510 - Spring 2025
 
 `python main.py`
 
-Start the OS by running the main.py file. This starts the system and the command line interface
+Start the OS by running the main.py file. This starts the system and the command line interface.
 
 # Execute
 
@@ -74,11 +74,17 @@ Run the file tests\run_tests.py. This will run multiple tests to ensure everythi
 # Set scheduler configuration
 
 shell>setSched <schedule_strategy:FCFS,RR, or MLFQ>
+
 # Set quantum values
 
 shell> setRR <int> <int>
+
 # Displays the quantums stored in the memory
 
-shell> quantums
+shell> quantum
+
 # Run the programs
 shell>execute <program> <arrival_time> -v     
+
+## Class diagram
+![Class diagram](https://github.com/JasonP670/cs6510/blob/main/M3_class_diagram3.drawio.png)![image]
