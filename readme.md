@@ -69,22 +69,24 @@ The program will continue to run until the user runs the command `exit`. This wi
 
 Run the file tests\run_tests.py. This will run multiple tests to ensure everything is working as expected. It includes unit tests as well as end to end tests.
 
-## Commands for Module 3
+# Commands for Module 3
 
-# Set scheduler configuration
+## Set scheduler configuration
 
 shell>setSched <schedule_strategy:FCFS,RR, or MLFQ>
 
-# Set quantum values
+## Set quantum values
 
 shell> setRR <int> <int>
 
-# Displays the quantums stored in the memory
+## Displays the quantums stored in the memory
 
 shell> quantum
 
-# Run the programs
+## Run the programs
+
 shell>execute <program> <arrival_time> -v     
 
 ## Class diagram
-![Class diagram](https://github.com/JasonP670/cs6510/blob/main/M3_class_diagram3.drawio.png)![image]
+
+![Class diagram](https://github.com/JasonP670/cs6510/blob/main/M3_class_diagram3.drawio.png)
