@@ -108,6 +108,7 @@ class System:
         for i in range(0, len(args), 2):
             filepath = args[i]
             arrival_time = int(args[i+1])
+            filepath = os.path.join('programs', filepath)
 
             self.prepare_program(filepath, arrival_time)
 
@@ -385,12 +386,16 @@ class System:
         self.scheduler.reset()
         self.memory_manager.reset()
         self.CPU.reset()
+        self.Q1.reset()
+        self.Q2.reset()
+        self.Q3.reset()
         self.job_queue = []
         self.ready_queue = []
         self.io_queue = []
         self.terminated_queue = []
         self.pid = 0
         self.errors = []
+        self.execution_history = []  # List to store process execution history
         self.verbose = False
         self.print("System reset.")
     def display_gantt_chart(self):

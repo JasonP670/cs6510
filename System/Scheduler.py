@@ -13,7 +13,7 @@ class SchedulingStrategy(Enum):
 class Scheduler:
     def __init__(self, system):
         self.system = system
-        self.scheduling_strategy = SchedulingStrategy.MLFQ
+        self.scheduling_strategy = SchedulingStrategy.FCFS
         self.mlfq_index = 0  # Add an index to track the current queue in MLfQ
         self.check_promote_at = 5 # Times to run pcb before promoting/demoting
         self.gantt_chart = []
@@ -341,5 +341,12 @@ class Scheduler:
             pcb.queue_level = 3
         else:
             raise ValueError(f"Invalid queue level {pcb.queue_level}")
+        
+    def reset(self):
+        self.scheduling_strategy = SchedulingStrategy.FCFS
+        self.mlfq_index = 0  # Add an index to track the current queue in MLfQ
+        self.check_promote_at = 5 # Times to run pcb before promoting/demoting
+        self.gantt_chart = []
+        self.real_start_time = None
     
 

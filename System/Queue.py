@@ -21,3 +21,7 @@ class Queue:
 
     def set_quantum(self, quantum):
         self.quantum = quantum
+
+    def reset(self):
+        self.processes = []
+        self.quantum = 1000000

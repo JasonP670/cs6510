@@ -479,5 +479,11 @@ class CPU:
     
     def __str__(self):
         return str(self.registers)
+    
+    def reset(self):
+        self.registers = [0 for _ in range(12)]
+        self.verbose = False
+        self.running = False
+        self.pcb = None
 
 
