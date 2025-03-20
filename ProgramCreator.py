@@ -2,21 +2,26 @@ import os
 from random import randint
 
 class ProgramCreator:
-    def __init__(self):
+    def __init__(self, qty=3):
+        
+        s_lines = 20
+        m_lines = 500
+        l_lines = 2000
+
         self.SIZES = {
             'small': {
-                'lines': 20,
-                'qty': 3,
+                'lines': s_lines,
+                'qty': qty,
                 'display_name': 'S'
             }, 
             'medium': {
                 'lines': 500,
-                'qty': 3,
+                'qty': m_lines,
                 'display_name': 'M'
             },
             'large': {
                 'lines': 2000,
-                'qty': 3,
+                'qty': l_lines,
                 'display_name': 'L'
             }
         }
