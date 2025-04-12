@@ -184,6 +184,12 @@ class CPU:
             self.system.wait(pcb)
             return True
         
+        elif swi == 30:  # PRODUCE
+            Producer.produce(self.registers[3], self.memory_buffer)
+
+        elif swi == 31:  # CONSUME
+            Consumer.consume(self.memory_buffer)
+        
         return True
             
 
