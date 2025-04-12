@@ -12,7 +12,6 @@ class ShellMode(Modes):
     def run(self):
         print("Welcome to shell mode. Type 'bash' to switch to bash mode. Type 'exit' to exit the shell.")
         while True:
-            # cmd, *args = input("shell > ").split()
             cmd, *args = input("\nshell > ").split()
             verbose = False
 

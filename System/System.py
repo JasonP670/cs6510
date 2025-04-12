@@ -66,6 +66,7 @@ class System:
             'gantt_graph': lambda: self.scheduler.plot_gantt_chart(True),
             'reset': self.reset,
             'gantt': self.display_gantt_chart
+        
         }
 
     def switch_mode(self):

@@ -1,6 +1,7 @@
 from constants import instructions
 import struct
 from struct import unpack
+from System.producer_consumer import Producer, Consumer
 
 
 class CPU:
@@ -15,6 +16,8 @@ class CPU:
         self.z  = 9  # Zero Flag
         self.sb = 10 # Status Byte
         self.pc = 11 # Program Counter
+
+        self.memory_buffer = []
 
         self.verbose = False
         self.running = False
@@ -185,7 +188,7 @@ class CPU:
             return True
         
         elif swi == 30:  # PRODUCE
-            Producer.produce(self.registers[3], self.memory_buffer)
+            Producer.produce(self.registers[0], self.memory_buffer)
 
         elif swi == 31:  # CONSUME
             Consumer.consume(self.memory_buffer)
