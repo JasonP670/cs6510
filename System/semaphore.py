@@ -1,10 +1,10 @@
-import threading
+
 
 
 class Semaphore:
     value = 1  # need to be 1 for producer consumer
-    value_lock = threading.Lock()
-    condition = threading.Condition(value_lock)
+    # value_lock = threading.Lock()
+    # condition = threading.Condition(value_lock)
 
     @classmethod
     def set_sem_init(cls, value):

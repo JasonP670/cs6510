@@ -29,7 +29,9 @@ class Consumer:
         if len(memory_buffer) > 0:
             number = memory_buffer.pop(0)
             print(f"Consuming {number}")
+            return True
         else:
             print("Consumer cannot consume - buffer is empty")
+            return False
         # Release the lock
         Semaphore.signal()

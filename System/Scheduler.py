@@ -13,7 +13,7 @@ class SchedulingStrategy(Enum):
 class Scheduler:
     def __init__(self, system):
         self.system = system
-        self.scheduling_strategy = SchedulingStrategy.FCFS
+        self.scheduling_strategy = SchedulingStrategy.RR
         self.mlfq_index = 0  # Add an index to track the current queue in MLfQ
         self.check_promote_at = 5 # Times to run pcb before promoting/demoting
         self.gantt_chart = []

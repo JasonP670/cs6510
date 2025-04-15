@@ -1,5 +1,5 @@
 class Queue:
-    def __init__(self, quantum=1000000):
+    def __init__(self, quantum=4):
         self.processes = []
         self.quantum = quantum
 

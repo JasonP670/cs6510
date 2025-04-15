@@ -188,10 +188,34 @@ class CPU:
             return True
         
         elif swi == 30:  # PRODUCE
-            Producer.produce(self.registers[0], self.memory_buffer)
+            # Producer.produce(self.registers[0], self.memory_buffer)
+            value = self.registers[0]
+            buffer = self.system.shared_memory['shared1']
+            buffer.append(value)
+            print("Produce... value: ", value)
 
         elif swi == 31:  # CONSUME
-            Consumer.consume(self.memory_buffer)
+            # success = Consumer.consume(self.memory_buffer)
+            # if not success:
+            #     self.registers[self.pc] -= 6
+            #     return False
+            buffer = self.system.shared_memory['shared1']
+            if buffer:
+                value = buffer.pop(0)
+                print("  - Consume... value: ", value)
+            else:
+                print('Buffer empty - retrying...')
+                self.registers[self.pc] -= 6
+            
+        elif swi == 33: # Mutex wait
+            if self.system.mutex == 1: # mutex locked
+                self.registers[self.pc] -= 6
+            else:
+                self.system.mutex = 1
+
+        elif swi == 34: # Mutex signal
+            self.system.mutex = 0
+
         
         return True
             
@@ -341,7 +365,8 @@ class CPU:
             Branch to address
         """
         address_bytes = operands[0:4]
-        address = struct.unpack('<I', bytes(address_bytes))[0]
+        offset = struct.unpack('<I', bytes(address_bytes))[0]
+        address = self.pcb.code_start + offset
         self.setPC(address)
         if self.verbose:
             print(f" - B {address}")
@@ -385,7 +410,8 @@ class CPU:
             Jump to label if Z register is greater than zero
         """
         address_bytes = operands[0:4]
-        address = struct.unpack('<I', bytes(address_bytes))[0]
+        offset = struct.unpack('<I', bytes(address_bytes))[0]
+        address = self.pcb.code_start + offset
         if self.registers[self.z] > 0:
             self.setPC(address)
             if self.verbose:
@@ -396,7 +422,8 @@ class CPU:
             Jump to label if Z register is less than zero
         """
         address_bytes = operands[0:4]
-        address = struct.unpack('<I', bytes(address_bytes))[0]
+        offset = struct.unpack('<I', bytes(address_bytes))[0]
+        address = self.pcb.code_start + offset
         if self.registers[self.z] < 0:
             self.setPC(address)
             if self.verbose:

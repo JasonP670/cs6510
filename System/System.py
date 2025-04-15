@@ -48,6 +48,9 @@ class System:
         self.Q2 = Queue()
         self.Q3 = Queue()
 
+        self.shared_memory = {}
+        self.mutex = 0
+
         self.commands = {
             'load': self.handle_load,
             'coredump': self.coredump,
@@ -65,8 +68,10 @@ class System:
             'quantums': lambda: print(f"Q1: {self.Q1.get_quantum()}, Q2: {self.Q2.get_quantum()}"),
             'gantt_graph': lambda: self.scheduler.plot_gantt_chart(True),
             'reset': self.reset,
-            'gantt': self.display_gantt_chart
-        
+            'gantt': self.display_gantt_chart,
+            'shm_open': self.smh_open,
+            'shared_memory': self.print_shared_memory,
+            'shm_unlink': self.shm_unlink,
         }
 
     def switch_mode(self):
@@ -382,6 +387,33 @@ class System:
         self.Q1.set_quantum(quantum1)
         self.Q2.set_quantum(quantum2)
 
+    def smh_open(self, *args):
+        if len(args) != 1:
+            print("Please specify the shared memory name. 'smh_open <name>'")
+            return None
+        self.shared_memory[args[0]] = [] # Unbounded buffer
+
+    def shm_unlink(self, *args):
+        if len(args) != 1:
+            print("Please specify the shared memory name. 'shm_unlink <name>'")
+            return None
+        if args[0] in self.shared_memory:
+            del self.shared_memory[args[0]]
+            print(f"Shared memory {args[0]} unlinked.")
+        else:
+            print(f"Shared memory {args[0]} not found.")
+
+    def print_shared_memory(self, *args):
+        if len(args) == 0:
+            print("Please specify the shared memory to print. 'shared_memory <name>'")
+            return None
+        
+
+        if args[0] in self.shared_memory:
+            print(self.shared_memory[args[0]])
+        else:
+            print(f"Shared memory {args[0]} not found.")
+
     def reset(self):
         self.clock.reset()
         self.scheduler.reset()
@@ -399,6 +431,7 @@ class System:
         self.execution_history = []  # List to store process execution history
         self.verbose = False
         self.print("System reset.")
+
     def display_gantt_chart(self):
         """
         Display a horizontal Gantt chart showing process execution over time

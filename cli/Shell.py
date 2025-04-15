@@ -12,24 +12,32 @@ class ShellMode(Modes):
     def run(self):
         print("Welcome to shell mode. Type 'bash' to switch to bash mode. Type 'exit' to exit the shell.")
         while True:
-            cmd, *args = input("\nshell > ").split()
+            cmd_line = input("\nshell > ").strip()
             verbose = False
 
-            if '-v' in args:
+            if '-v' in cmd_line:
                 verbose = True
-                args.remove('-v')
+                cmd_line = cmd_line.replace('-v', '').strip()
 
             if verbose:
                 self.System.verbose = True
 
-            if cmd == 'bash':
-                return 'bash'
-            if cmd == 'exit':
-                return None
-            if cmd == 'osx':
-                self.execute_terimal_command(args)
-            else:
-                self.handle_command(cmd, args)
+            commands = cmd_line.split('|')
+            for command in commands:
+                command = command.strip()
+                if not command:
+                    continue
+
+                cmd, *args = command.split()
+
+                if cmd == 'bash':
+                    return 'bash'
+                if cmd == 'exit':
+                    return None
+                if cmd == 'osx':
+                    self.execute_terimal_command(args)
+                else:
+                    self.handle_command(cmd, args)
             
 
     def handle_command(self, cmd, args):
