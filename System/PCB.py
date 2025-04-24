@@ -1,4 +1,7 @@
 from constants import PCBState
+from .memory_constants import PAGE_SIZE, NUM_PAGES
+from .MemoryManager import MemoryManager
+
 
 class PCB:
     def __init__(self, pid, pc, registers=None, state=PCBState.NEW):
@@ -42,28 +45,32 @@ class PCB:
 
         self.CPU_code = None
 
+        # MMU
+        self.pages = []
+        self.page_table = [None]*(NUM_PAGES // (PAGE_SIZE // 4))
+
     def __str__(self):
         return f"PCB(pid={self.pid}, file={self.file}, state={self.state.name})"
-        
+
     def __repr__(self):
         return f"PCB(pid={self.pid}, file={self.file}, state={self.state.name})"
-    
+
     def __getitem__(self, key):
         return getattr(self, key)
-    
+
     def __setitem__(self, key, value):
         setattr(self, key, value)
 
     def __compare__(self, other):
         return self.pid == other.pid
-    
+
     def ready(self, time):
         self.state = PCBState.READY
         if self.start_time == None:
             self.start_time = time
             self.waiting_time = time - self.arrival_time
 
-    def running(self): 
+    def running(self):
         self.state = PCBState.RUNNING
         if self.response_time == None:
             self.response_time = self.start_time - self.arrival_time
@@ -77,12 +84,12 @@ class PCB:
         self.turnaround_time = self.end_time - self.arrival_time
         self.waiting_time = self.turnaround_time - self.execution_time
 
-    def set_arrival_time(self, time):    
+    def set_arrival_time(self, time):
         self.arrival_time = time
 
     def get_pc(self):
         return self.registers[11]
-   
+
     def make_child(self, pid, pc):
         child = PCB(pid, pc, self.registers.copy(), self.state)
         child.loader = self.loader
@@ -96,16 +103,16 @@ class PCB:
         self.add_child(child)
 
         return child
-    
+
     def has_children(self):
         return len(self.children) > 0
-    
+
     def add_child(self, child):
         self.children.append(child)
-    
+
     def get_children(self):
         return self.children
-    
+
     def update(self, program_info):
         self.loader = program_info['loader']
         self.byte_size = program_info['byte_size']

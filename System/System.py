@@ -10,16 +10,18 @@ try:
     from .Scheduler import Scheduler
     from .MemoryManager import MemoryManager
     from .Queue import Queue
+    from .memory_constants import PAGE_SIZE, NUM_PAGES
 except ImportError:
     sys.path.append(
         os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
     )
     from hardware.CPU import CPU
     from hardware.Clock import Clock
-    from PCB import PCB
-    from Scheduler import Scheduler
-    from MemoryManager import MemoryManager
-    from Queue import Queue
+    from .PCB import PCB
+    from .Scheduler import Scheduler
+    from .MemoryManager import MemoryManager
+    from .Queue import Queue
+    from .memory_constants import PAGE_SIZE, NUM_PAGES
 
 from constants import USER_MODE, KERNEL_MODE, SYSTEM_CODES, PCBState, CHILD_EXEC_PROGRAM
 
@@ -37,6 +39,7 @@ class System:
         self.system_codes = SYSTEM_CODES
         self.pid = 0
         self.execution_history = []  # List to store process execution history
+        self.page_size = PAGE_SIZE  # Store as instance variable
 
         # Process management queues
         self.ready_queue = []
@@ -72,6 +75,10 @@ class System:
             'shm_open': self.smh_open,
             'shared_memory': self.print_shared_memory,
             'shm_unlink': self.shm_unlink,
+            'setpage': self.set_page,
+            'getpagesize': self.getpagesize,
+            'setpagenumber': self.setpagenumber,
+            'setpagesize': self.setpagesize,
         }
 
     def switch_mode(self):
@@ -123,7 +130,6 @@ class System:
             self.display_state_table()
 
         self.scheduler.schedule_jobs()
-            
 
     def prepare_program(self, filepath, arrival_time):
         program_info = self.memory_manager.prepare_program(filepath)
@@ -391,7 +397,7 @@ class System:
         if len(args) != 1:
             print("Please specify the shared memory name. 'smh_open <name>'")
             return None
-        self.shared_memory[args[0]] = [] # Unbounded buffer
+        self.shared_memory[args[0]] = []  # Unbounded buffer
 
     def shm_unlink(self, *args):
         if len(args) != 1:
@@ -407,7 +413,6 @@ class System:
         if len(args) == 0:
             print("Please specify the shared memory to print. 'shared_memory <name>'")
             return None
-        
 
         if args[0] in self.shared_memory:
             print(self.shared_memory[args[0]])
@@ -486,6 +491,56 @@ class System:
         print("\nLegend:")
         print("  . = Idle")
         print("  # = Number shown is quantum value used")
+
+    def set_page(self, page_num: int) -> None:
+        """Set the current page number for the active process."""
+        if not self.ready_queue:
+            self.system_code(101, "No active process")
+            return
+
+        active_pcb = self.ready_queue[0]
+        if page_num < 0 or page_num >= len(active_pcb.page_table):
+            self.system_code(110, f"Page number {page_num} is out of bounds")
+            return
+
+        active_pcb.current_page = page_num
+        self.print(
+            f"Set current page to {page_num} for process {active_pcb.pid}")
+
+    def getpagesize(self, *args) -> None:
+        """Display the current page size."""
+        if args:
+            self.system_code(103, "getpagesize does not take any arguments")
+            return
+        self.print(f"Page size: {self.page_size} bytes")
+
+    def setpagenumber(self, page_num: int) -> None:
+        """Set the number of pages for the active process."""
+        if not self.ready_queue:
+            self.system_code(101, "No active process")
+            return
+
+        active_pcb = self.ready_queue[0]
+        if page_num < 0 or page_num > NUM_PAGES:
+            self.system_code(110, f"Page number {page_num} is out of bounds")
+            return
+
+        active_pcb.page_table = [None] * page_num
+        self.print(
+            f"Set page table size to {page_num} for process {active_pcb.pid}")
+
+    def setpagesize(self, size: str) -> None:
+        """Set the page size for the system."""
+        try:
+            size_int = int(size)
+            if size_int <= 0:
+                self.system_code(110, f"Invalid page size: {size_int}")
+                return
+
+            self.page_size = size_int
+            self.print(f"Page size set to {size_int} bytes")
+        except ValueError:
+            self.system_code(110, f"Invalid page size: {size}")
 
 
 if __name__ == '__main__':
