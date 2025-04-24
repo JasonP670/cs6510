@@ -61,16 +61,11 @@ class CPU:
     def system_call(self, code):
         self.system.system_code(code)
 
-    # def run_pcb(self, pcb, verbose=False):
-    #     if verbose: self.verbose = True
-    #     self.setPC(pcb['start_line'])
-    
-    def run_program(self, pcb, quantum, verbose=False):
-        # pcb['start_time'] = self.system.clock.time
-        # if verbose: self.verbose = True
 
-        # Restor CPU state from PCB
+    
+    def run_program(self, pcb, quantum, memory_manager, verbose=False):
         self.pcb = pcb
+        self.memory_manager = memory_manager
         self.registers = pcb.registers.copy()
         self.registers[self.pc] = pcb.pc
 
@@ -124,6 +119,9 @@ class CPU:
         self.verbose = False
         self.running = False
         pcb.ready(self.system.clock.time)
+
+    def translate(self, virtual_address):
+        return self.memory_manager.translate(self.pcb, virtual_address)
 
     def _swi(self, operands, pcb):
         swi = int(operands[0])
@@ -314,9 +312,10 @@ class CPU:
             MEM[R2] <= R1
         """    
         source_register, addess_register, *rest = operands
-        address = self.registers[addess_register]
+        virtual_address = self.registers[addess_register]
+        physical_address = self.translate(virtual_address)
         value = self.registers[source_register]
-        self.memory[address:address+4] = struct.pack('<I', value)
+        self.memory[physical_address:physical_address+4] = struct.pack('<I', value)
         if self.verbose:
             print(f" - STR {source_register} <= MEM[{addess_register}]")
 
@@ -328,9 +327,10 @@ class CPU:
             MEM[R2] <= byte(memory[R1])
         """    
         source_register, addess_register, *rest = operands
-        address = self.registers[addess_register]
+        virtual_address = self.registers[addess_register]
+        physical_address = self.translate(virtual_address)
         value = self.memory[self.registers[source_register]]
-        self.memory[address] = value & 0xFF
+        self.memory[physical_address] = value & 0xFF
         if self.verbose:
             print(f" - STRB {source_register} <= MEM[{addess_register}]")
 
@@ -340,12 +340,13 @@ class CPU:
             LDR R1 R2
             R1 <= MEM[R2]
         """    
-        source_register, addess_register, *rest = operands
-        address = self.registers[addess_register]
-        value = struct.unpack('<I', self.memory[address:address+4])[0]
+        source_register, address_register, *rest = operands
+        virtual_address = self.registers[address_register]
+        physical_address = self.translate(virtual_address)
+        value = struct.unpack('<I', self.memory[physical_address:physical_address+4])[0]
         self.registers[source_register] = value
         if self.verbose:
-            print(f" - LDR {source_register} <= MEM[{addess_register}]")
+            print(f" - LDR {source_register} <= MEM[{address_register}]")
 
     def _ldrb(self, operands):
         """
@@ -354,8 +355,9 @@ class CPU:
             R1 <= byte(MEM[R2])
         """    
         source_register, addess_register, *rest = operands
-        address = self.registers[addess_register]
-        value = self.memory[address]
+        virtual_address = self.registers[addess_register]
+        physical_address = self.translate(virtual_address)
+        value = self.memory[physical_address]
         self.registers[source_register] = value
         if self.verbose:
             print(f" - LDRB {source_register} <= MEM[{addess_register}]")
@@ -434,7 +436,7 @@ class CPU:
             Jump to label if Z register is equal to zero
         """
         address_bytes = operands[0:4]
-        address = struct.unpack('<I', bytes(address_bytes))[0] + self.pcb.loader
+        address = struct.unpack('<I', bytes(address_bytes))[0]
         
         if self.registers[self.z] == 0:
             self.setPC(address)
@@ -505,7 +507,9 @@ class CPU:
             Fetch the next instruction
         """
         pc = self.registers[self.pc]
-        instruction = self.memory[pc:pc+6]
+        physical_address = self.translate(pc)
+
+        instruction = self.memory[physical_address:physical_address+6]
         self.registers[self.pc] += 6
         return instruction
     

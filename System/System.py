@@ -28,7 +28,7 @@ class System:
     def __init__(self):
         self.clock = Clock()
         self.scheduler = Scheduler(self)
-        self.memory_manager = MemoryManager(self, '1M')
+        self.memory_manager = MemoryManager(self, '1K')
         self.memory = self.memory_manager.memory
         self.CPU = CPU(self.memory, self)
         self.mode = USER_MODE
@@ -72,6 +72,11 @@ class System:
             'shm_open': self.smh_open,
             'shared_memory': self.print_shared_memory,
             'shm_unlink': self.shm_unlink,
+            'ps': self.ps_command,
+            'getpagenumber': lambda: print(self.memory_manager.get_page_limit()),
+            'setpagenumber': self.set_page_number,
+            'getpagesize': lambda: print(self.memory_manager.get_page_size()),
+            'setpagesize': self.set_page_size,
         }
 
     def switch_mode(self):
@@ -79,6 +84,10 @@ class System:
         if self.verbose:
             self.print(f"Switching user_mode from {self.mode} to {new_mode}")
         self.mode = new_mode
+
+    
+        
+        
 
     def call(self, cmd, *args):
         if cmd in self.commands:
@@ -167,15 +176,18 @@ class System:
             'quantum': quantum
         })
 
-    def handle_load(self, filepath):
-        program_info = self.memory_manager.prepare_program(filepath)
-        if program_info:
-            pcb = self.create_pcb(program_info, self.clock.time)
-            self.memory_manager.load_to_memory(pcb)
-            self.job_queue.append(pcb)
-        # Display state table after command execution
-        if self.verbose:
-            self.display_state_table()
+    def handle_load(self, *args):
+        for filepath in args:
+            filepath = os.path.join('programs', filepath)
+
+            program_info = self.memory_manager.prepare_program(filepath)
+            if program_info:
+                pcb = self.create_pcb(program_info, self.clock.time)
+                self.memory_manager.load_to_memory(pcb)
+                self.job_queue.append(pcb)
+            # Display state table after command execution
+            if self.verbose:
+                self.display_state_table()
 
     def handle_check_memory_available(self, pcb):
         try:
@@ -214,28 +226,30 @@ class System:
             print("Please specify the program to run.")
             return None
 
-        program = args[0]
+        for arg in args:
 
-        pcb = None
-        for job in self.job_queue + self.ready_queue:
-            if job.file == program:
-                pcb = job
-                break
-        self.job_queue.remove(pcb)
-        self.print(f"Running program: {pcb}")
+            program = 'programs\\' + arg
 
-        pcb.start_time = self.clock.time
-        self.CPU.run_program(pcb, self.verbose)
+            pcb = None
+            for job in self.job_queue + self.ready_queue:
+                if job.file == program:
+                    pcb = job
+                    break
+            self.job_queue.remove(pcb)
+            self.print(f"Running program: {pcb}")
 
-        if pcb.state == PCBState.TERMINATED:
-            self.memory_manager.free_memory(pcb)
-            self.terminated_queue.append(pcb)
-            pcb.end_time = self.clock.time
+            pcb.start_time = self.clock.time
+            self.CPU.run_program(pcb, 1_000_000, self.memory_manager, self.verbose)
 
-        if self.verbose:
-            self.display_state_table()
+            if pcb.state == PCBState.TERMINATED:
+                # self.memory_manager.free_memory(pcb)
+                self.terminated_queue.append(pcb)
+                pcb.end_time = self.clock.time
 
-        return pcb.registers[0]
+            if self.verbose:
+                self.display_state_table()
+
+            return pcb.registers[0]
 
     def coredump(self):
         if self.verbose:
@@ -431,6 +445,125 @@ class System:
         self.execution_history = []  # List to store process execution history
         self.verbose = False
         self.print("System reset.")
+
+    def process_table(self):
+        all_pcb_lists = [self.job_queue, self.ready_queue, self.io_queue, self.terminated_queue]
+        table = {}
+        for queue in all_pcb_lists:
+            for pcb in queue:
+                table[pcb.pid] = pcb
+        return table
+    
+    def set_page_number(self, *args):
+        """
+        Sets the page number limit for the memory manager.
+
+        Args:
+            *args: A variable-length argument list. Expects a single argument
+                   which is the page number as an integer.
+
+        Returns:
+            None
+
+        Behavior:
+            - If no arguments or more than one argument are provided, prints an
+              error message prompting the user to specify a single page number.
+            - If the provided argument cannot be converted to an integer, prints
+              an error message indicating an invalid page number.
+            - If a valid integer is provided, sets the page limit in the memory
+              manager.
+
+        Example:
+            set_page_number("10")  # Sets the page limit to 10.
+            set_page_number()      # Prints an error message.
+            set_page_number("abc") # Prints an error message.
+        """
+        if len(args) != 1:
+            print("Please specify the number of pages. 'setpagenumber <number>'")
+            return None
+        try:
+            self.memory_manager.set_page_limit(int(args[0]))
+        except ValueError:
+            print("Invalid page number. Please enter a valid integer.")
+            return None
+        
+        
+        
+    def set_page_size(self, *args):
+        """
+        Sets the page size for the memory manager.
+        Args:
+            *args: A single argument specifying the page size as an integer.
+        Returns:
+            None
+        Behavior:
+            - Lines of code that are in a page, will by mutiplied by 6 to get bytes
+            - If no arguments or more than one argument are provided, prints an error message
+              prompting the user to specify the page size in the correct format.
+            - If the provided argument cannot be converted to an integer, prints an error
+              message indicating that the page size must be a valid integer.
+            - If a valid integer is provided, sets the page size in the memory manager.
+        Example:
+            set_page_size(1)
+        """
+        if len(args) != 1:
+            print("Please specify the page size. 'setpagesize <size>'")
+            return None
+        try:
+            self.memory_manager.set_page_size(int(args[0]))
+        except ValueError:
+            print("Invalid page size. Please enter a valid integer.")
+            return None
+    
+    def display_memory_frames(self):
+        print("\n=== Physical Memory Map ===")
+        print("Frame | PID | Page # | Dirty | Ref")
+        print("------+-----+--------+-------+-----")
+
+        frame_usage = ['-'] * self.memory_manager.num_frames
+        for pid, pcb in self.process_table().items():
+            for vp, entry in pcb.page_table.items():
+                if entry.valid:
+                    frame_usage[entry.frame] = (pid, vp, entry.dirty, entry.reference)
+
+        for frame in range(self.memory_manager.num_frames):
+            entry = frame_usage[frame]
+            if entry == '-':
+                print(f"{frame:5} |  -  |   -    |       |")
+            else:
+                pid, vp, dirty, ref = entry
+                print(f"{frame:5} | {pid:3} | {vp:6} |   {'✔' if dirty else '✘'}   |  {'✔' if ref else '✘'}")
+
+
+    def ps_command(self, *args):
+        print("\n=== Memory Status Report ===")
+
+        page_size = self.memory_manager.page_size
+        total_pages = self.memory_manager.num_frames
+        free_frames = len(self.memory_manager.free_frames)
+        used_frames = total_pages - free_frames
+
+        print(f"Page Size: {page_size} bytes")
+        print(f"Total Pages: {total_pages}")
+        print(f"Used Pages: {used_frames}")
+        print(f"Free Pages: {free_frames}")
+        print(f"Total Memory: {self.memory.size} bytes")
+        print(f"Free Memory: {free_frames * page_size} bytes")
+        print(f"Used Memory: {used_frames * page_size} bytes")
+        # self.display_memory_frames()
+
+        print("\n=== Process Page Tables ===")
+
+        for pid, pcb in self.process_table().items():
+            print(f"\nPID {pid} - {pcb.file} - State: {pcb.state.name}")
+            print(f"  Page Count: {pcb.num_pages}")
+            print("  Page Table:")
+            for vp, entry in pcb.page_table.items():
+                frame_str = f"{entry.frame:2}" if entry.frame is not None else " - "
+                status = "Valid" if entry.valid else "Invalid"
+                print(f"    Page {vp:2} → Frame {frame_str} [{status}, R={entry.reference}, D={entry.dirty}]")
+            print(f"  Registers: {pcb.registers}")
+
 
     def display_gantt_chart(self):
         """
