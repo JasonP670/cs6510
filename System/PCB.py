@@ -16,6 +16,11 @@ class PCB:
         self.state = state
         # self.states = ['NEW', 'READY', 'RUNNING', 'WAITING', 'TERMINATED']
 
+        # memory management
+        self.page_table = {}
+        self.resident_pages = set()
+        self.max_resident_pages = None
+
         # Code Sections
         self.loader = None
         self.byte_size = None
