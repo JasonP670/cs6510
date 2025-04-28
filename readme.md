@@ -89,4 +89,4 @@ shell>execute <program> <arrival_time> -v
 
 ## Class diagram
 
-![Class diagram](https://github.com/JasonP670/cs6510/blob/main/M3_class_diagram3.drawio.png)
+![Class diagram](https://github.com/JasonP670/cs6510/blob/main/M5_class_diagram3.drawio.png)
