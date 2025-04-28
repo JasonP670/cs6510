@@ -1,4 +1,7 @@
-from .Modes import Modes
+try:
+    from cli.Modes import Modes
+except ImportError:
+    from Modes import Modes
 
 class BashMode(Modes):
     def __init__(self, system):

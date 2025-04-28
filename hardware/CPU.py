@@ -6,6 +6,10 @@ from System.producer_consumer import Producer, Consumer
 
 class CPU:
     def __init__(self, memory, system):
+        """
+            CPU class to simulate a simple CPU with registers and memory.
+            It can execute instructions and perform system calls.
+        """
         self.memory = memory
         self.system = system
         num_registers = 12
@@ -64,6 +68,10 @@ class CPU:
 
     
     def run_program(self, pcb, quantum, memory_manager, verbose=False):
+        """
+            Run a program in the CPU. It fetches, decodes, and executes instructions.
+            It also handles system calls and preemption.
+        """
         self.pcb = pcb
         self.memory_manager = memory_manager
         self.registers = pcb.registers.copy()
@@ -73,17 +81,24 @@ class CPU:
         time_slice = 0
 
 
+        # Run the program until the end of the code, until a system call is made,
+        # or until the time slice is reached
         while self.running and self.registers[self.pc] < pcb['code_end']:
-            instruction = self._fetch()
-            opcode, operands = self._decode(instruction)
+            # Fetch the instruction from memory
+            instruction = self._fetch() 
 
+            # Decode the instruction
+            opcode, operands = self._decode(instruction) 
 
+            # Execute the instruction
             self._execute(opcode, operands, pcb)
 
+            # Increment the time slice, clock and execution time
             time_slice += 1
             self.system.clock.increment()
             pcb.execution_time += 1
 
+            # Make sure we aren't going out of bounds in memory
             if self.registers[self.pc] >= len(self.memory):
                 self.system_call(110)
                 print("End of memory reached")
@@ -91,20 +106,27 @@ class CPU:
                 break
                 
 
+            # Check if the time slice has reached the quantum
+            # if so, preempt the process and return to the ready queue
             if time_slice == quantum and self.running :
                 self.preempt(pcb)
                 
 
 
     def _execute(self, opcode, operands, pcb):
+        """ 
+            Execute the instruction based on the opcode.
+        """
+        # Handle SWI
         if opcode == "SWI":
             return self._swi(operands, pcb)
             
-
+        # Handle other instructions
         elif opcode in self.ops:
             self.ops[opcode](operands)
             return True
         
+        # Handle unknown opcode
         else:
             self.system_call(103)
             print(f"Unknown opcode: {opcode}")
@@ -113,7 +135,12 @@ class CPU:
             return False
         
     def preempt(self, pcb):
+        """
+            Preempt the process and return it to the ready queue.
+        """
+        # Copy state of the registers to the PCB
         pcb.registers = self.registers.copy()
+        # Mark the PC in the PCB, so it can be resumed later
         pcb.pc = self.registers[self.pc]
         pcb.preempt_count += 1
         self.verbose = False
@@ -121,9 +148,18 @@ class CPU:
         pcb.ready(self.system.clock.time)
 
     def translate(self, virtual_address):
+        """
+            Translate a virtual address to a physical address using the memory manager.
+        """
         return self.memory_manager.translate(self.pcb, virtual_address)
 
     def _swi(self, operands, pcb):
+        """
+            Handle system calls based on the SWI instruction.
+            SWI <swi_number>
+        """
+
+        # Get the SWI number from the operands
         swi = int(operands[0])
 
         if self.verbose:
@@ -163,9 +199,6 @@ class CPU:
             self.verbose = False
             self.running = False
             
-
-
-            
         elif swi == 10: # FORK
             pcb.registers = self.registers.copy()
             pcb.pc = self.registers[self.pc]
@@ -186,17 +219,12 @@ class CPU:
             return True
         
         elif swi == 30:  # PRODUCE
-            # Producer.produce(self.registers[0], self.memory_buffer)
             value = self.registers[0]
             buffer = self.system.shared_memory['shared1']
             buffer.append(value)
             print("Produce... value: ", value)
 
         elif swi == 31:  # CONSUME
-            # success = Consumer.consume(self.memory_buffer)
-            # if not success:
-            #     self.registers[self.pc] -= 6
-            #     return False
             buffer = self.system.shared_memory['shared1']
             if buffer:
                 value = buffer.pop(0)

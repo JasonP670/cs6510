@@ -1,3 +1,5 @@
+# Instructions found in the .asm and their corresponding opcodes.
+
 instructions = {
     16: "ADD",
     17: "SUB",

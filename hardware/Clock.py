@@ -1,4 +1,7 @@
 class Clock:
+    """A simple clock class that keeps track of hypothetical time in seconds.
+    It provides methods to increment time, reset the clock, and compare time values.
+    """
     def __init__(self, time: int = 0):
         self.time = time
 

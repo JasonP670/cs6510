@@ -4,12 +4,10 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from scipy.interpolate import griddata
 import datetime
-from ProgramCreator import ProgramCreator
 
 
 def main():
     page_numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-    page_sizes = [1, 2, 3]
 
 
     results = {

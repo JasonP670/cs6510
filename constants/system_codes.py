@@ -1,3 +1,4 @@
+# System codes and their meanings
 SYSTEM_CODES = {
     0: "Success",
     1: "Operation completed successfully",

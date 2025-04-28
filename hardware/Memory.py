@@ -1,4 +1,8 @@
 class Memory:
+    """
+    A class to represent a memory block.
+    The memory is represented as a bytearray, and the size can be specified in bytes, kilobytes, megabytes, or gigabytes.
+    The memory is initialized to 1 kilobyte."""
     def __init__(self, size='1K'):
         self.size = self.calculate_size(size)
         self.cols = 6
@@ -6,6 +10,10 @@ class Memory:
         self._memory = bytearray(self.size)
 
     def calculate_size(self, size):
+        """
+        Calculate the size of the memory in bytes.
+        The size can be specified in bytes (B), kilobytes (K), megabytes (M), or gigabytes (G).
+        """
         size_int = int(size[:-1])
         size_char = size[-1]
 
@@ -22,6 +30,7 @@ class Memory:
         return f"<Memory size={self.size} bytes>"
 
     def __str__(self):
+        """Return a string representation of the memory block."""
         string = '\n'
         l = 0
         for i in range(self.rows):
