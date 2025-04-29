@@ -11,6 +11,10 @@ class SchedulingStrategy(Enum):
     MLFQ = 'MLFQ'
 
 class Scheduler:
+    """
+    Scheduler class to manage the scheduling of processes in the system.
+    It implements various scheduling strategies such as FCFS, RR, and MLFQ.
+    """
     def __init__(self, system):
         self.system = system
         self.scheduling_strategy = SchedulingStrategy.RR
@@ -20,7 +24,7 @@ class Scheduler:
         self.real_start_time = None
 
     def schedule_jobs(self):
-        """ Schedule jobs in the system."""
+        """ Schedule jobs in the system based on the selected scheduling strategy."""
         start_time = self.system.clock.time
         self.real_start_time = datetime.datetime.now()
         self._sort_ready_queue()

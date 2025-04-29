@@ -249,7 +249,7 @@ class System:
             if self.verbose:
                 self.display_state_table()
 
-            return pcb.registers[0]
+            # return pcb.registers[0]
 
     def coredump(self):
         if self.verbose:

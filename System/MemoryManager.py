@@ -180,6 +180,7 @@ class MemoryManager:
         # Check how many pages are currently loaded
         if len(pcb.resident_pages) >= pcb.max_resident_pages:
             self.system.print(f"[LIMIT] PID {pcb.pid} has reached max resident pages ({pcb.max_resident_pages})")
+            # If page limit reached, evict a page from this process, make room for new page
             self.evict_page(pcb)
 
         # If frame needed, check free frame availability
@@ -206,11 +207,16 @@ class MemoryManager:
 
     def translate(self, pcb, virtual_address):
         """ Translate a virtual address to a physical address. """
+        # Get the page number the virtual address maps to
         page_number = virtual_address // self.page_size
+
+        # Get the offset within the page
         offset = virtual_address % self.page_size
 
+        # Check if the page is loaded
         if page_number not in pcb.page_table or pcb.page_table[page_number].valid == False:
             self.page_faults += 1
+            # if page not loaded, load to memory
             self.load_page(pcb, page_number)
 
         frame = pcb.page_table[page_number].frame

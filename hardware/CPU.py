@@ -147,11 +147,7 @@ class CPU:
         self.running = False
         pcb.ready(self.system.clock.time)
 
-    def translate(self, virtual_address):
-        """
-            Translate a virtual address to a physical address using the memory manager.
-        """
-        return self.memory_manager.translate(self.pcb, virtual_address)
+    
 
     def _swi(self, operands, pcb):
         """
@@ -532,7 +528,9 @@ class CPU:
     
     def _fetch(self):
         """
-            Fetch the next instruction
+            Fetch the next instruction,
+            PC points to virtual memory, 
+            translate it to physical memory using the memory manager.
         """
         pc = self.registers[self.pc]
         physical_address = self.translate(pc)
@@ -541,6 +539,12 @@ class CPU:
         self.registers[self.pc] += 6
         return instruction
     
+    def translate(self, virtual_address):
+        """
+            Translate a virtual address to a physical address using the memory manager.
+        """
+        return self.memory_manager.translate(self.pcb, virtual_address)
+
     def setPC(self, value):
         self.registers[self.pc] = value
     

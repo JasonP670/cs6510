@@ -1,6 +1,11 @@
 from constants import PCBState
 
 class PCB:
+    """
+    Process Control Block (PCB) class to manage process information.
+    Each PCB contains information about the process's state, registers,
+    memory management, metrics, and child processes.
+    """
     def __init__(self, pid, pc, registers=None, state=PCBState.NEW):
         self.pid = pid
         self.file = None
@@ -14,7 +19,6 @@ class PCB:
 
         # States
         self.state = state
-        # self.states = ['NEW', 'READY', 'RUNNING', 'WAITING', 'TERMINATED']
 
         # memory management
         self.page_table = {}
@@ -63,32 +67,52 @@ class PCB:
         return self.pid == other.pid
     
     def ready(self, time):
+        """
+        Set the PCB state to READY and update the waiting time.
+        If the PCB is being moved to the ready queue for the first time,
+        set the start time and calculate the waiting time.
+        """
         self.state = PCBState.READY
         if self.start_time == None:
             self.start_time = time
             self.waiting_time = time - self.arrival_time
 
-    def running(self): 
+    def running(self):
+        """
+        Set the PCB state to RUNNING and update the response time.
+        If the PCB is being moved to the running state for the first time,
+        set the start time and calculate the response time.
+        """ 
         self.state = PCBState.RUNNING
         if self.response_time == None:
             self.response_time = self.start_time - self.arrival_time
 
     def waiting(self):
+        """
+        Set the PCB state to WAITING.
+        """
         self.state = PCBState.WAITING
 
     def terminated(self, time):
+        """
+        Set the PCB state to TERMINATED and update the end time, turnaround time and waiting time
+        """
         self.state = PCBState.TERMINATED
         self.end_time = time
         self.turnaround_time = self.end_time - self.arrival_time
         self.waiting_time = self.turnaround_time - self.execution_time
 
-    def set_arrival_time(self, time):    
+    def set_arrival_time(self, time):
         self.arrival_time = time
 
     def get_pc(self):
         return self.registers[11]
    
     def make_child(self, pid, pc):
+        """
+        Create a child PCB with the same state and registers as the parent.
+        The child PCB will have a new PID and program counter (PC).
+        """
         child = PCB(pid, pc, self.registers.copy(), self.state)
         child.loader = self.loader
         child.byte_size = self.byte_size
@@ -112,6 +136,11 @@ class PCB:
         return self.children
     
     def update(self, program_info):
+        """
+        Update the PCB with new program information.
+        This includes the loader, byte size, data start and end addresses,
+        and code start and end addresses.
+        """
         self.loader = program_info['loader']
         self.byte_size = program_info['byte_size']
         self.data_start = program_info['data_start']
